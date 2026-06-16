@@ -36,6 +36,126 @@ function recalcISV(){
   document.getElementById('m-b-isv').value = isvAmt>0 ? `L ${isvAmt.toLocaleString('es-HN',{minimumFractionDigits:2})}` : '';
   document.getElementById('m-b-total-final').value = total>0 ? `L ${total.toLocaleString('es-HN',{minimumFractionDigits:2})}` : '';
 }
+
+// ── ID TYPE TOGGLE ────────────────────────────────────────
+let currentIdType = 'RTN';
+function setIdType(type){
+  currentIdType = type;
+  const btns = {RTN:'btn-rtn', DNI:'btn-dni', 'N/A':'btn-nid'};
+  Object.entries(btns).forEach(([k,id])=>{
+    const el = document.getElementById(id);
+    if(el){ el.className = k===type ? 'btn btn-p btn-s' : 'btn btn-g btn-s'; el.style.borderRadius='6px'; }
+  });
+  const lbl = document.getElementById('id-field-lbl');
+  const inp = document.getElementById('m-c-rtn');
+  if(type==='N/A'){
+    if(lbl) lbl.textContent='Identificación';
+    if(inp){ inp.value='N/A'; inp.disabled=true; inp.style.opacity='.5'; }
+  } else {
+    if(lbl) lbl.textContent=`Número de ${type}`;
+    if(inp){ inp.value=''; inp.disabled=false; inp.style.opacity='1';
+      inp.placeholder=type==='RTN'?'00000000000000':'0801-2000-00000'; }
+  }
+}
+function openMapsLink(){
+  const lat=document.getElementById('m-c-lat')?.value;
+  const lng=document.getElementById('m-c-lng')?.value;
+  if(lat&&lng) window.open(`https://www.google.com/maps?q=${lat},${lng}`,'_blank');
+  else alert('Ingresa latitud y longitud primero.');
+}
+
+// ── REPORTS: period + chart type ──────────────────────────
+let reportPeriod = 'hoy';
+let reportChartType = 'bar';
+
+const REPORT_DATA = {
+  hoy:     { labels:['8am','10am','12pm','2pm','4pm','6pm'], rentas:[8500,12000,9500,15000,11000,7500], ventas:[1200,800,1500,900,1100,600], servicios:[0,2500,0,1800,0,0] },
+  semana:  { labels:['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'], rentas:[45000,38000,52000,41000,58000,29000,12000], ventas:[8500,7200,9100,6800,11200,14500,3200], servicios:[5500,0,8000,0,5500,0,0] },
+  quincena:{ labels:['D1','D3','D5','D7','D9','D11','D13','D15'], rentas:[42000,38000,55000,48000,61000,44000,52000,58000], ventas:[7500,6200,8800,7100,9500,8200,7800,10200], servicios:[0,5500,0,8000,0,5500,0,5500] },
+  mes:     { labels:['S1','S2','S3','S4'], rentas:[180000,210000,195000,227320], ventas:[28000,31500,26800,31700], servicios:[19000,21500,18000,18500] },
+  q1:      { labels:['Ene','Feb','Mar'], rentas:[420000,380000,510000], ventas:[85000,92000,98000], servicios:[115000,108000,102000] },
+  q2:      { labels:['Abr','May','Jun'], rentas:[480000,530000,612320], ventas:[88000,105000,118000], servicios:[122000,115000,117000] },
+  q3:      { labels:['Jul','Ago','Sep'], rentas:[490000,515000,540000], ventas:[92000,98000,105000], servicios:[118000,121000,125000] },
+  q4:      { labels:['Oct','Nov','Dic'], rentas:[560000,590000,640000], ventas:[110000,125000,145000], servicios:[128000,132000,140000] },
+  semestre:{ labels:['Ene','Feb','Mar','Abr','May','Jun'], rentas:[420000,380000,510000,480000,530000,612320], ventas:[85000,92000,98000,88000,105000,118000], servicios:[115000,108000,102000,122000,115000,117000] },
+  año:     { labels:['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'], rentas:[420,380,510,480,530,612,490,515,540,560,590,640].map(v=>v*1000), ventas:[85,92,98,88,105,118,92,98,105,110,125,145].map(v=>v*1000), servicios:[115,108,102,122,115,117,118,121,125,128,132,140].map(v=>v*1000) },
+  todo:    { labels:['2022','2023','2024'], rentas:[5200000,6800000,7420000], ventas:[820000,1050000,1180000], servicios:[980000,1240000,1354000] },
+};
+
+const PERIOD_KPIS = {
+  hoy:      { ing:'L 64,500', cost:'L 21,200', util:'L 43,300', mg:'67.1%' },
+  semana:   { ing:'L 274,900', cost:'L 98,400', util:'L 176,500', mg:'64.2%' },
+  quincena: { ing:'L 493,200', cost:'L 178,600', util:'L 314,600', mg:'63.8%' },
+  mes:      { ing:'L 847,320', cost:'L 312,400', util:'L 534,920', mg:'63.1%' },
+  q1:       { ing:'L 2,390,000', cost:'L 868,000', util:'L 1,522,000', mg:'63.7%' },
+  q2:       { ing:'L 2,565,320', cost:'L 942,000', util:'L 1,623,320', mg:'63.3%' },
+  q3:       { ing:'L 2,703,000', cost:'L 998,000', util:'L 1,705,000', mg:'63.1%' },
+  q4:       { ing:'L 3,170,000', cost:'L 1,158,000', util:'L 2,012,000', mg:'63.5%' },
+  semestre: { ing:'L 4,955,320', cost:'L 1,810,000', util:'L 3,145,320', mg:'63.5%' },
+  año:      { ing:'L 10,828,320', cost:'L 3,956,000', util:'L 6,872,320', mg:'63.5%' },
+  todo:     { ing:'L 28,250,000', cost:'L 10,300,000', util:'L 17,950,000', mg:'63.6%' },
+};
+
+function setReportPeriod(p, btn){
+  reportPeriod = p;
+  document.querySelectorAll('[id^="rp-"]').forEach(el=>el.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderReports();
+}
+function setChartType(t, btn){
+  reportChartType = t;
+  document.querySelectorAll('[id^="ct-"]').forEach(el=>el.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderReports();
+}
+
+function renderReports(){
+  const kpi = PERIOD_KPIS[reportPeriod] || PERIOD_KPIS.mes;
+  document.getElementById('report-kpis').innerHTML=[
+    {label:'Ingresos totales',val:kpi.ing,icon:'💰',color:'#10B981'},
+    {label:'Costo operativo',val:kpi.cost,icon:'⚙️',color:'#F59E0B'},
+    {label:'Utilidad neta',val:kpi.util,icon:'📈',color:'#3B82F6'},
+    {label:'Margen neto',val:kpi.mg,icon:'🎯',color:'#8B5CF6'},
+  ].map(s=>`<div class="card" style="border-color:${s.color}33">
+    <div class="c-head"><span class="c-title">${s.label}</span><span>${s.icon}</span></div>
+    <div class="stat-val" style="color:${s.color};font-size:20px">${s.val}</div>
+  </div>`).join('');
+
+  setTimeout(()=>{
+    const ctx = document.getElementById('chartBar');
+    if(!ctx) return;
+    if(chartBar) chartBar.destroy();
+    const d = REPORT_DATA[reportPeriod] || REPORT_DATA.semestre;
+    const isRadar = reportChartType === 'radar';
+    const isLine  = reportChartType === 'line';
+    const isArea  = reportChartType === 'area';
+
+    const datasets = [
+      { label:'Rentas',    data: isRadar ? d.rentas.slice(0,6) : d.rentas,    backgroundColor: isLine||isArea ? 'rgba(59,130,246,.15)' : '#3B82F6', borderColor:'#3B82F6', fill: isArea, tension:.4, borderRadius: isLine||isArea||isRadar ? 0 : 4, borderWidth:2 },
+      { label:'Ventas',    data: isRadar ? d.ventas.slice(0,6) : d.ventas,    backgroundColor: isLine||isArea ? 'rgba(16,185,129,.15)' : '#10B981', borderColor:'#10B981', fill: isArea, tension:.4, borderRadius: isLine||isArea||isRadar ? 0 : 4, borderWidth:2 },
+      { label:'Servicios', data: isRadar ? d.servicios.slice(0,6) : d.servicios, backgroundColor: isLine||isArea ? 'rgba(139,92,246,.15)' : '#8B5CF6', borderColor:'#8B5CF6', fill: isArea, tension:.4, borderRadius: isLine||isArea||isRadar ? 0 : 4, borderWidth:2 },
+    ];
+
+    const chartType = isRadar ? 'radar' : (isLine||isArea ? 'line' : 'bar');
+    const labels    = isRadar ? (d.labels.slice(0,6).length>=3 ? d.labels.slice(0,6) : ['L1','L2','L3','L4','L5','L6']) : d.labels;
+
+    chartBar = new Chart(ctx.getContext('2d'),{
+      type: chartType,
+      data: { labels, datasets },
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{ display:true, position:'bottom', labels:{ color:'#94A3B8', font:{size:11}, padding:16 } }, tooltip:{ callbacks:{ label:v=>`L ${v.raw.toLocaleString()}` } } },
+        scales: isRadar ? {
+          r:{ grid:{color:'#1E293B'}, ticks:{color:'#475569',font:{size:9},callback:v=>`L${(v/1000).toFixed(0)}k`}, pointLabels:{color:'#94A3B8',font:{size:11}} }
+        } : {
+          x:{ grid:{color:'#1E293B'}, ticks:{color:'#475569',font:{size:11}} },
+          y:{ grid:{color:'#1E293B'}, ticks:{color:'#475569',font:{size:10},callback:v=>`L${(v/1000).toFixed(0)}k`} }
+        }
+      }
+    });
+  },80);
+}
+
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
@@ -402,10 +522,7 @@ tbody td:first-child{color:var(--text);font-weight:500;}
       <div class="module" id="mod-reports">
         <div class="sec-h">
           <span class="sec-t">📊 Reportes</span>
-          <div style="display:flex;gap:8px">
-            <select class="f-sel" style="font-size:12px;padding:5px 10px;width:auto;background:var(--surface2);border:1px solid var(--border2);color:var(--text);border-radius:8px;outline:none;">
-              <option>Junio 2024</option><option>Mayo 2024</option><option>Q2 2024</option>
-            </select>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <div class="export-wrap">
               <button class="btn btn-g btn-s" onclick="toggleExport('exp-reports')">⬇ Exportar ▾</button>
               <div class="export-menu" id="exp-reports">
@@ -415,6 +532,28 @@ tbody td:first-child{color:var(--text);font-weight:500;}
                 <div class="export-item" onclick="printTable('reports')">🖨 Imprimir / PDF</div>
               </div>
             </div>
+          </div>
+        </div>
+        <!-- REPORT CONTROLS -->
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
+          <div style="display:flex;gap:2px;background:var(--surface2);border-radius:10px;padding:3px;flex-wrap:wrap;">
+            <button class="tab active" id="rp-hoy" onclick="setReportPeriod('hoy',this)">Hoy</button>
+            <button class="tab" id="rp-semana" onclick="setReportPeriod('semana',this)">Semana</button>
+            <button class="tab" id="rp-quincena" onclick="setReportPeriod('quincena',this)">Quincena</button>
+            <button class="tab" id="rp-mes" onclick="setReportPeriod('mes',this)">Mes</button>
+            <button class="tab" id="rp-q1" onclick="setReportPeriod('q1',this)">Q1</button>
+            <button class="tab" id="rp-q2" onclick="setReportPeriod('q2',this)">Q2</button>
+            <button class="tab" id="rp-q3" onclick="setReportPeriod('q3',this)">Q3</button>
+            <button class="tab" id="rp-q4" onclick="setReportPeriod('q4',this)">Q4</button>
+            <button class="tab" id="rp-semestre" onclick="setReportPeriod('semestre',this)">Semestre</button>
+            <button class="tab" id="rp-año" onclick="setReportPeriod('año',this)">Año</button>
+            <button class="tab" id="rp-todo" onclick="setReportPeriod('todo',this)">Todo</button>
+          </div>
+          <div style="display:flex;gap:2px;background:var(--surface2);border-radius:10px;padding:3px;">
+            <button class="tab active" id="ct-bar" onclick="setChartType('bar',this)">📊 Barras</button>
+            <button class="tab" id="ct-line" onclick="setChartType('line',this)">📈 Línea</button>
+            <button class="tab" id="ct-area" onclick="setChartType('area',this)">🏔 Área</button>
+            <button class="tab" id="ct-radar" onclick="setChartType('radar',this)">🕸 Radar</button>
           </div>
         </div>
         <div class="g4" id="report-kpis"></div>
@@ -502,10 +641,52 @@ tbody td:first-child{color:var(--text);font-weight:500;}
       <div class="f-grp"><label class="f-lbl">Teléfono</label><input class="f-in" id="m-c-phone" placeholder="+504 0000-0000"/></div>
     </div>
     <div class="f-row">
-      <div class="f-grp"><label class="f-lbl">Ciudad</label><input class="f-in" id="m-c-city" placeholder="Tegucigalpa"/></div>
       <div class="f-grp"><label class="f-lbl">Correo electrónico</label><input class="f-in" id="m-c-email" type="email" placeholder="correo@empresa.com"/></div>
+      <div class="f-grp"><label class="f-lbl">Teléfono secundario</label><input class="f-in" id="m-c-phone2" placeholder="+504 0000-0000"/></div>
     </div>
     <div class="f-row1 f-grp"><label class="f-lbl">Dirección</label><textarea class="f-ta" id="m-c-addr" placeholder="Dirección completa..." style="min-height:55px"></textarea></div>
+    <div class="f-row">
+      <div class="f-grp"><label class="f-lbl">Departamento</label>
+        <select class="f-sel" id="m-c-dept">
+          <option value="NA">N/A — No aplica</option>
+          <option>Francisco Morazán</option><option>Cortés</option><option>Atlántida</option>
+          <option>Comayagua</option><option>Copán</option><option>Choluteca</option>
+          <option>El Paraíso</option><option>Gracias a Dios</option><option>Intibucá</option>
+          <option>Islas de la Bahía</option><option>La Paz</option><option>Lempira</option>
+          <option>Ocotepeque</option><option>Olancho</option><option>Santa Bárbara</option>
+          <option>Valle</option><option>Yoro</option>
+        </select></div>
+      <div class="f-grp"><label class="f-lbl">Municipio / Ciudad</label><input class="f-in" id="m-c-city" placeholder="Ej. Tegucigalpa"/></div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <span style="font-size:12px;font-weight:600;color:var(--text2);">Tipo de identificación</span>
+        <div style="display:flex;gap:4px;background:var(--border);border-radius:8px;padding:2px;">
+          <button id="btn-rtn" class="btn btn-p btn-s" onclick="setIdType('RTN')" style="border-radius:6px;">RTN</button>
+          <button id="btn-dni" class="btn btn-g btn-s" onclick="setIdType('DNI')" style="border-radius:6px;">DNI</button>
+          <button id="btn-nid" class="btn btn-g btn-s" onclick="setIdType('N/A')" style="border-radius:6px;">N/A</button>
+        </div>
+      </div>
+      <div class="f-grp">
+        <label class="f-lbl" id="id-field-lbl">Número de RTN</label>
+        <input class="f-in" id="m-c-rtn" placeholder="00000000000000"/>
+      </div>
+    </div>
+    <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:10px;padding:12px;margin-bottom:12px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:12px;font-weight:600;color:var(--text2);">📍 Coordenadas de entrega (GPS)</span>
+        <span style="font-size:10px;color:var(--text3);">Opcional</span>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <div class="f-grp" style="flex:1"><label class="f-lbl">Latitud</label><input class="f-in" id="m-c-lat" placeholder="14.0818" type="number" step="0.000001"/></div>
+        <div class="f-grp" style="flex:1"><label class="f-lbl">Longitud</label><input class="f-in" id="m-c-lng" placeholder="-87.2068" type="number" step="0.000001"/></div>
+        <div class="f-grp" style="width:auto;justify-content:flex-end;">
+          <label class="f-lbl" style="opacity:0">.</label>
+          <button class="btn btn-g btn-s" onclick="openMapsLink()" title="Abrir en Google Maps">🗺 Maps</button>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;">💡 Pega las coordenadas desde Google Maps: clic derecho → "¿Qué hay aquí?"</div>
+    </div>
     <div class="m-footer">
       <button class="btn btn-g" onclick="closeModal('modal-client')">Cancelar</button>
       <button class="btn btn-p" onclick="saveClient()">✓ Guardar cliente</button>
@@ -896,7 +1077,7 @@ function renderInv(){
       </div>
       <div style="display:flex;gap:6px;margin-top:10px">
         <button class="btn btn-g btn-s" style="flex:1">Editar</button>
-        <button class="btn btn-p btn-s" style="flex:1">Rentar</button>
+        <button class="${item.cat==='Literatura'||item.cat==='Universitario'?'btn btn-grn btn-s':'btn btn-p btn-s'}" style="flex:1">${item.cat==='Literatura'||item.cat==='Universitario'?'🛒 Vender':'🏗 Rentar'}</button>
       </div>
     </div>`;}).join('');
 }
@@ -1005,7 +1186,7 @@ function renderIntegrations(){
           </span>
           <div class="toggle ${intStates[int.id]?'on':''}" onclick="intStates['${int.id}']=!intStates['${int.id}'];renderIntegrations()"></div>
         </div>
-        ${intStates[int.id]?`<button class="btn btn-g btn-s" style="width:100%;margin-top:4px">Configurar ⚙</button>`:''}
+
       </div>`).join('')}</div>`).join('');
 }
 
