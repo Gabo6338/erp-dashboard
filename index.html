@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>NexERP — Sistema de Gestión Modular</title>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/recharts@2.8.0/umd/Recharts.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --bg:#0A0E1A;
+  --surface:#111827;
+  --surface2:#1a2235;
+  --sidebar:#0D1424;
+  --border:#1E293B;
+  --border2:#2a3a52;
+  --blue:#3B82F6;
+  --blue-dim:#1d4ed8;
+  --green:#10B981;
+  --amber:#F59E0B;
+  --red:#EF4444;
+  --purple:#8B5CF6;
+  --cyan:#06B6D4;
+  --text:#F1F5F9;
+  --text2:#94A3B8;
+  --text3:#475569;
+  --mono:'JetBrains Mono',monospace;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow:hidden;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-track{background:var(--surface);}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+.app{display:flex;height:100vh;}
+
+/* SIDEBAR */
+.sidebar{width:220px;min-width:220px;background:var(--sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column;transition:width .2s;overflow:hidden;}
+.sidebar.collapsed{width:60px;min-width:60px;}
+.sidebar-logo{padding:20px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--blue),var(--purple));border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.logo-text{font-weight:700;font-size:15px;white-space:nowrap;overflow:hidden;}
+.logo-text span{color:var(--blue);}
+.sidebar-nav{flex:1;overflow-y:auto;padding:8px 0;}
+.nav-section{padding:6px 16px 2px;font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;overflow:hidden;}
+.sidebar.collapsed .nav-section{opacity:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;border-radius:0;transition:all .15s;position:relative;white-space:nowrap;}
+.nav-item:hover{background:var(--surface);}
+.nav-item.active{background:rgba(59,130,246,.12);border-right:2px solid var(--blue);}
+.nav-item.active .nav-icon{color:var(--blue);}
+.nav-item.active .nav-label{color:var(--text);}
+.nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0;color:var(--text2);}
+.nav-label{font-size:13px;font-weight:500;color:var(--text2);overflow:hidden;}
+.nav-badge{margin-left:auto;background:var(--blue);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;flex-shrink:0;}
+.sidebar-footer{padding:12px;border-top:1px solid var(--border);}
+.user-card{display:flex;align-items:center;gap:8px;padding:8px;border-radius:8px;cursor:pointer;}
+.user-card:hover{background:var(--surface);}
+.user-avatar{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;}
+.user-info{overflow:hidden;}
+.user-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.user-role{font-size:10px;color:var(--text3);}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+.topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;background:var(--surface);flex-shrink:0;}
+.topbar-title{font-size:15px;font-weight:600;flex:1;}
+.topbar-actions{display:flex;align-items:center;gap:8px;}
+.lang-toggle{background:var(--surface2);border:1px solid var(--border2);color:var(--text2);padding:4px 10px;border-radius:6px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;}
+.lang-toggle:hover{border-color:var(--blue);color:var(--blue);}
+.search-bar{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:6px 12px;border-radius:8px;font-size:13px;width:200px;font-family:'Inter',sans-serif;outline:none;}
+.search-bar:focus{border-color:var(--blue);}
+.notif-btn{background:var(--surface2);border:1px solid var(--border2);width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;font-size:15px;}
+.notif-dot{position:absolute;top:6px;right:6px;width:6px;height:6px;background:var(--red);border-radius:50%;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.content{flex:1;overflow-y:auto;padding:20px;}
+
+/* CARDS & WIDGETS */
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px;}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:20px;}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-bottom:20px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.card-title{font-size:12px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;}
+.card-icon{font-size:18px;}
+.stat-value{font-size:26px;font-weight:700;font-family:var(--mono);margin-bottom:2px;}
+.stat-sub{font-size:11px;color:var(--text2);}
+.stat-change{font-size:11px;font-weight:600;}
+.stat-change.up{color:var(--green);}
+.stat-change.down{color:var(--red);}
+
+/* TABLE */
+.table-wrap{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+thead th{padding:9px 12px;text-align:left;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--border);}
+tbody tr{border-bottom:1px solid var(--border);transition:background .1s;}
+tbody tr:hover{background:var(--surface2);}
+tbody td{padding:10px 12px;color:var(--text2);}
+tbody td:first-child{color:var(--text);font-weight:500;}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+.badge-green{background:rgba(16,185,129,.12);color:var(--green);}
+.badge-amber{background:rgba(245,158,11,.12);color:var(--amber);}
+.badge-red{background:rgba(239,68,68,.12);color:var(--red);}
+.badge-blue{background:rgba(59,130,246,.12);color:var(--blue);}
+.badge-purple{background:rgba(139,92,246,.12);color:var(--purple);}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;font-family:'Inter',sans-serif;transition:all .15s;}
+.btn-primary{background:var(--blue);color:#fff;}
+.btn-primary:hover{background:var(--blue-dim);}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text2);}
+.btn-ghost:hover{border-color:var(--blue);color:var(--blue);}
+.btn-danger{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.2);}
+.btn-sm{padding:4px 10px;font-size:12px;}
+
+/* TABS */
+.tabs{display:flex;gap:2px;background:var(--surface2);border-radius:10px;padding:3px;margin-bottom:18px;width:fit-content;}
+.tab{padding:6px 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);transition:all .15s;}
+.tab.active{background:var(--surface);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.3);}
+
+/* AI CHAT */
+.ai-chat{display:flex;flex-direction:column;height:100%;}
+.chat-messages{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:12px;}
+.msg{max-width:80%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.5;}
+.msg-user{background:var(--blue);color:#fff;align-self:flex-end;border-radius:12px 12px 2px 12px;}
+.msg-ai{background:var(--surface2);color:var(--text);align-self:flex-start;border-radius:12px 12px 12px 2px;border:1px solid var(--border2);}
+.msg-ai-header{display:flex;align-items:center;gap:6px;margin-bottom:4px;font-size:11px;font-weight:600;color:var(--blue);}
+.chat-input-area{padding:12px;border-top:1px solid var(--border);display:flex;gap:8px;}
+.chat-input{flex:1;background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:9px 12px;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;resize:none;}
+.chat-input:focus{border-color:var(--blue);}
+.ai-thinking{display:flex;align-items:center;gap:6px;color:var(--text3);font-size:12px;}
+.dots span{animation:blink 1.2s infinite;}
+.dots span:nth-child(2){animation-delay:.2s;}
+.dots span:nth-child(3){animation-delay:.4s;}
+@keyframes blink{0%,80%,100%{opacity:0;}40%{opacity:1;}}
+
+/* FORM */
+.form-row{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:12px;}
+.form-group{display:flex;flex-direction:column;gap:4px;}
+.form-label{font-size:12px;font-weight:600;color:var(--text2);}
+.form-input,.form-select{background:var(--surface2);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;font-family:'Inter',sans-serif;outline:none;}
+.form-input:focus,.form-select:focus{border-color:var(--blue);}
+.form-select option{background:var(--surface);}
+
+/* INTEGRATIONS */
+.int-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.int-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;transition:border-color .2s;}
+.int-card:hover{border-color:var(--blue);}
+.int-header{display:flex;align-items:center;gap:10px;}
+.int-logo{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.int-name{font-size:14px;font-weight:600;}
+.int-desc{font-size:12px;color:var(--text2);line-height:1.4;}
+.int-status{display:flex;align-items:center;justify-content:space-between;}
+.toggle{width:36px;height:20px;background:var(--border2);border-radius:10px;position:relative;cursor:pointer;transition:background .2s;}
+.toggle.on{background:var(--green);}
+.toggle::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left .2s;}
+.toggle.on::after{left:18px;}
+
+/* INVENTORY */
+.inv-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;}
+.inv-item{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;transition:all .15s;}
+.inv-item:hover{border-color:var(--blue);transform:translateY(-1px);}
+.inv-item-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.inv-item-name{font-size:13px;font-weight:600;}
+.inv-item-cat{font-size:11px;color:var(--text3);}
+.inv-bar-wrap{background:var(--border);border-radius:4px;height:4px;margin:8px 0;}
+.inv-bar{height:4px;border-radius:4px;transition:width .3s;}
+.inv-bar.high{background:var(--green);}
+.inv-bar.med{background:var(--amber);}
+.inv-bar.low{background:var(--red);}
+.inv-meta{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);}
+
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(4px);}
+.modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;padding:24px;width:520px;max-width:90vw;max-height:80vh;overflow-y:auto;}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;}
+.modal-title{font-size:16px;font-weight:700;}
+.modal-close{cursor:pointer;color:var(--text2);font-size:18px;background:none;border:none;color:var(--text2);}
+
+/* SECTIONS */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.section-title{font-size:16px;font-weight:700;}
+.chart-container{height:200px;}
+
+/* MINI CALENDAR STRIP */
+.cal-strip{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px;}
+.cal-day{min-width:44px;height:58px;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;background:var(--surface2);border:1px solid var(--border);transition:all .15s;}
+.cal-day.has-order{border-color:var(--blue);}
+.cal-day.today{background:rgba(59,130,246,.15);border-color:var(--blue);}
+.cal-day-num{font-size:15px;font-weight:700;font-family:var(--mono);}
+.cal-day-label{font-size:9px;color:var(--text3);text-transform:uppercase;}
+.cal-dot{width:4px;height:4px;border-radius:50%;background:var(--blue);}
+
+.loading-bar{height:2px;background:linear-gradient(90deg,var(--blue),var(--purple),var(--blue));background-size:200% 100%;animation:loading 1.5s infinite;}
+@keyframes loading{0%{background-position:200% 0;}100%{background-position:-200% 0;}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+const {LineChart,Line,BarChart,Bar,XAxis,YAxis,Tooltip,ResponsiveContainer,PieChart,Pie,Cell,AreaChart,Area}=Recharts;
+
+// ── DATA MOCK ──────────────────────────────────────────────
+const MOCK={
+  stats:{
+    revenue:{value:'L 847,320',change:'+12.4%',up:true,label:'Ingresos del mes'},
+    orders:{value:'143',change:'+8',up:true,label:'Órdenes activas'},
+    clients:{value:'67',change:'+3',up:true,label:'Clientes activos'},
+    pending:{value:'L 124,500',change:'-5.2%',up:false,label:'Por cobrar'},
+  },
+  revenueData:[
+    {m:'Ene',v:620000},{m:'Feb',v:580000},{m:'Mar',v:710000},
+    {m:'Abr',v:690000},{m:'May',v:750000},{m:'Jun',v:847320},
+  ],
+  categoryData:[
+    {name:'Andamios',value:58},{name:'Libros',value:22},{name:'Servicios',value:12},{name:'Envíos',value:8}
+  ],
+  orders:[
+    {id:'ORD-2106',client:'Avance MSP',type:'Renta',items:'Andamio tubular x40',start:'2024-06-01',end:'2024-06-30',total:'L 32,000',status:'activo'},
+    {id:'ORD-2105',client:'Constructora López',type:'Renta',items:'Andamio colgante x12',start:'2024-05-15',end:'2024-06-15',total:'L 18,500',status:'activo'},
+    {id:'ORD-2104',client:'Pedro Martínez',type:'Venta',items:'García Márquez x3',start:'2024-06-10',end:'—',total:'L 1,200',status:'completado'},
+    {id:'ORD-2103',client:'UNAH Librería',type:'Venta',items:'Libros universitarios x20',start:'2024-06-08',end:'—',total:'L 8,400',status:'completado'},
+    {id:'ORD-2102',client:'Hernández & Cía',type:'Servicio',items:'Instalación andamios',start:'2024-06-05',end:'2024-06-07',total:'L 5,500',status:'completado'},
+    {id:'ORD-2101',client:'Alcaldía Ojojona',type:'Renta',items:'Andamio marco x60',start:'2024-05-01',end:'2024-07-01',total:'L 54,000',status:'atrasado'},
+  ],
+  inventory:[
+    {id:'INV-001',name:'Andamio Tubular',cat:'Andamios',total:200,available:142,rented:58,price:'L 800/mes'},
+    {id:'INV-002',name:'Andamio Marco',cat:'Andamios',total:150,available:90,rented:60,price:'L 900/mes'},
+    {id:'INV-003',name:'Andamio Colgante',cat:'Andamios',total:60,available:48,rented:12,price:'L 1,200/mes'},
+    {id:'INV-004',name:'Tablón de Madera',cat:'Accesorios',total:400,available:280,rented:120,price:'L 150/mes'},
+    {id:'INV-005',name:'Gato Nivelador',cat:'Accesorios',total:100,available:62,rented:38,price:'L 200/mes'},
+    {id:'INV-006',name:'Cien Años de Soledad',cat:'Literatura',total:30,available:18,sold:12,price:'L 350'},
+    {id:'INV-007',name:'El Aleph — Borges',cat:'Literatura',total:25,available:14,sold:11,price:'L 280'},
+    {id:'INV-008',name:'Libros de Texto UNAH',cat:'Universitario',total:80,available:35,sold:45,price:'L 420'},
+  ],
+  clients:[
+    {id:'CLI-001',name:'Avance MSP',type:'Empresa',rtn:'08019007067160',phone:'+504 2280-3280',city:'Tegucigalpa',orders:12,total:'L 284,000',status:'activo'},
+    {id:'CLI-002',name:'Constructora López',type:'Empresa',rtn:'08019001234567',phone:'+504 2234-5678',city:'Tegucigalpa',orders:8,total:'L 156,000',status:'activo'},
+    {id:'CLI-003',name:'Alcaldía Ojojona',type:'Gobierno',rtn:'08019007890123',phone:'+504 2789-0123',city:'Ojojona',orders:5,total:'L 98,000',status:'moroso'},
+    {id:'CLI-004',name:'UNAH Librería',type:'Institución',rtn:'08019004567890',phone:'+504 2232-0000',city:'Tegucigalpa',orders:15,total:'L 62,000',status:'activo'},
+    {id:'CLI-005',name:'Pedro Martínez',type:'Individual',rtn:'—',phone:'+504 9876-5432',city:'Comayagüela',orders:3,total:'L 4,200',status:'activo'},
+  ],
+  integrations:[
+    {id:'booqable',name:'Booqable',icon:'📦',color:'#3B82F6',desc:'Importar órdenes e inventario existente',connected:true,cat:'Inventario'},
+    {id:'quickbooks',name:'QuickBooks',icon:'📊',color:'#10B981',desc:'Sincronización contable bidireccional',connected:false,cat:'Contabilidad'},
+    {id:'pixelpay',name:'Pixel Pay / Ficohsa',icon:'💳',color:'#F59E0B',desc:'Pagos en línea en Honduras (Lempiras)',connected:true,cat:'Pagos'},
+    {id:'figma',name:'Figma',icon:'🎨',color:'#8B5CF6',desc:'Exportar activos de diseño al sistema',connected:false,cat:'Diseño'},
+    {id:'zoho',name:'Zoho Suite',icon:'🏢',color:'#EF4444',desc:'CRM, correo y marketing integrado',connected:false,cat:'CRM'},
+    {id:'whatsapp',name:'WhatsApp Business',icon:'💬',color:'#25D366',desc:'Notificaciones y seguimiento de clientes',connected:false,cat:'Comunicación'},
+    {id:'sheets',name:'Google Sheets / Excel',icon:'📋',color:'#34A853',desc:'Exportar reportes y datos en tiempo real',connected:true,cat:'Reportes'},
+    {id:'salesforce',name:'Salesforce / HubSpot',icon:'🔗',color:'#06B6D4',desc:'Importar CRM externo vía CSV o API',connected:false,cat:'CRM'},
+    {id:'stripe',name:'Stripe',icon:'⚡',color:'#6366F1',desc:'Pagos internacionales con tarjeta',connected:false,cat:'Pagos'},
+  ],
+};
+const COLORS=['#3B82F6','#10B981','#F59E0B','#8B5CF6'];
+
+// ── LANG ──────────────────────────────────────────────────
+const T={
+  es:{
+    dashboard:'Panel Principal',inventory:'Inventario',orders:'Órdenes',
+    clients:'Clientes',billing:'Facturación',reports:'Reportes',
+    ai:'Asistente IA',integrations:'Integraciones',settings:'Configuración',
+    newOrder:'Nueva Orden',newItem:'Agregar Ítem',newClient:'Nuevo Cliente',
+    search:'Buscar...',status:'Estado',actions:'Acciones',
+    available:'Disponible',rented:'Rentado',sold:'Vendido',
+    active:'Activo',completed:'Completado',delayed:'Atrasado',delinquent:'Moroso',
+    total:'Total',client:'Cliente',type:'Tipo',items:'Ítems',
+    aiPlaceholder:'Pregunta sobre inventario, finanzas, clientes...',
+    aiSend:'Enviar',connect:'Conectar',connected:'Conectado',disconnect:'Desconectar',
+    configure:'Configurar',category:'Categoría',
+    stockLevel:'Nivel de stock',unit:'Unidad',price:'Precio',
+    revenueChart:'Ingresos mensuales',categoryChart:'Distribución por categoría',
+    topClients:'Clientes principales',recentOrders:'Órdenes recientes',
+    inventoryAlert:'Alertas de inventario',
+    name:'Nombre',phone:'Teléfono',city:'Ciudad',totalOrders:'Órdenes',
+    save:'Guardar',cancel:'Cancelar',edit:'Editar',delete:'Eliminar',view:'Ver',
+  },
+  en:{
+    dashboard:'Dashboard',inventory:'Inventory',orders:'Orders',
+    clients:'Clients',billing:'Billing',reports:'Reports',
+    ai:'AI Assistant',integrations:'Integrations',settings:'Settings',
+    newOrder:'New Order',newItem:'Add Item',newClient:'New Client',
+    search:'Search...',status:'Status',actions:'Actions',
+    available:'Available',rented:'Rented',sold:'Sold',
+    active:'Active',completed:'Completed',delayed:'Delayed',delinquent:'Delinquent',
+    total:'Total',client:'Client',type:'Type',items:'Items',
+    aiPlaceholder:'Ask about inventory, finances, clients...',
+    aiSend:'Send',connect:'Connect',connected:'Connected',disconnect:'Disconnect',
+    configure:'Configure',category:'Category',
+    stockLevel:'Stock level',unit:'Unit',price:'Price',
+    revenueChart:'Monthly revenue',categoryChart:'Category breakdown',
+    topClients:'Top clients',recentOrders:'Recent orders',
+    inventoryAlert:'Inventory alerts',
+    name:'Name',phone:'Phone',city:'City',totalOrders:'Orders',
+    save:'Save',cancel:'Cancel',edit:'Edit',delete:'Delete',view:'View',
+  }
+};
+
+// ── STATUS BADGE ───────────────────────────────────────────
+function StatusBadge({status,lang}){
+  const map={
+    activo:{cls:'badge-green',es:'Activo',en:'Active'},
+    completado:{cls:'badge-blue',es:'Completado',en:'Completed'},
+    atrasado:{cls:'badge-red',es:'Atrasado',en:'Delayed'},
+    moroso:{cls:'badge-amber',es:'Moroso',en:'Delinquent'},
+    disponible:{cls:'badge-green',es:'Disponible',en:'Available'},
+  };
+  const s=map[status]||{cls:'badge-blue',es:status,en:status};
+  return <span className={`badge ${s.cls}`}>{lang==='es'?s.es:s.en}</span>;
+}
+
+// ── DASHBOARD MODULE ───────────────────────────────────────
+function Dashboard({t}){
+  const days=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  const today=new Date().getDate();
+  const calDays=Array.from({length:14},(_,i)=>{
+    const d=today-7+i;
+    return {num:d<1?d+30:d,hasOrder:[2,4,5,8,10,12].includes(i),isToday:i===7};
+  });
+  return(
+    <div>
+      <div className="grid-4">
+        {Object.values(MOCK.stats).map((s,i)=>(
+          <div className="card" key={i}>
+            <div className="card-header">
+              <span className="card-title">{s.label}</span>
+              <span className="card-icon">{['💰','📋','👥','⏳'][i]}</span>
+            </div>
+            <div className="stat-value">{s.value}</div>
+            <div className="stat-change">{s.up?'↑':'↓'} <span className={s.up?'stat-change up':'stat-change down'}>{s.change}</span> <span className="stat-sub">vs mes anterior</span></div>
+          </div>
+        ))}
+      </div>
+      <div className="grid-2">
+        <div className="card">
+          <div className="card-header"><span className="card-title">{t.revenueChart}</span><span className="card-icon">📈</span></div>
+          <div className="chart-container">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={MOCK.revenueData}>
+                <defs>
+                  <linearGradient id="gBlue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3B82F6" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#3B82F6" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="m" tick={{fill:'#475569',fontSize:11}} axisLine={false} tickLine={false}/>
+                <YAxis tick={{fill:'#475569',fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>`L ${(v/1000).toFixed(0)}k`}/>
+                <Tooltip contentStyle={{background:'#111827',border:'1px solid #1E293B',borderRadius:8,fontSize:12}} formatter={v=>[`L ${v.toLocaleString()}`,'']}/>
+                <Area type="monotone" dataKey="v" stroke="#3B82F6" strokeWidth={2} fill="url(#gBlue)"/>
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-header"><span className="card-title">{t.categoryChart}</span><span className="card-icon">🍩</span></div>
+          <div style={{display:'flex',alignItems:'center',gap:16,height:200}}>
+            <ResponsiveContainer width="55%" height="100%">
+              <PieChart>
+                <Pie data={MOCK.categoryData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} dataKey="value">
+                  {MOCK.categoryData.map((_,i)=><Cell key={i} fill={COLORS[i]}/>)}
+                </Pie>
+                <Tooltip contentStyle={{background:'#111827',border:'1px solid #1E293B',borderRadius:8,fontSize:12}} formatter={v=>[`${v}%`,'']}/>
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{flex:1,display:'flex',flexDirection:'column',gap:8}}>
+              {MOCK.categoryData.map((d,i)=>(
+                <div key={i} style={{display:'flex',alignItems:'center',gap:8}}>
+                  <div style={{width:10,height:10,borderRadius:2,background:COLORS[i],flexShrink:0}}/>
+                  <span style={{fontSize:12,color:'#94A3B8',flex:1}}>{d.name}</span>
+                  <span style={{fontSize:12,fontWeight:700,fontFamily:'JetBrains Mono,monospace'}}>{d.value}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div className="card">
+        <div className="card-header"><span className="card-title">{t.recentOrders}</span><button className="btn btn-ghost btn-sm">{t.view} todos</button></div>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>{t.client}</th><th>{t.type}</th><th>{t.items}</th><th>{t.total}</th><th>{t.status}</th></tr></thead>
+            <tbody>
+              {MOCK.orders.slice(0,4).map(o=>(
+                <tr key={o.id}>
+                  <td><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:12,color:'#3B82F6'}}>{o.id}</span></td>
+                  <td>{o.client}</td>
+                  <td><span className="badge badge-purple">{o.type}</span></td>
+                  <td style={{fontSize:12}}>{o.items}</td>
+                  <td><span style={{fontFamily:'JetBrains Mono,monospace',fontWeight:600}}>{o.total}</span></td>
+                  <td><StatusBadge status={o.status}/></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── INVENTORY MODULE ───────────────────────────────────────
+function Inventory({t}){
+  const [search,setSearch]=useState('');
+  const [tab,setTab]=useState('todos');
+  const cats=['todos','Andamios','Accesorios','Literatura','Universitario'];
+  const filtered=MOCK.inventory.filter(i=>{
+    const matchCat=tab==='todos'||i.cat===tab;
+    const matchSearch=i.name.toLowerCase().includes(search.toLowerCase());
+    return matchCat&&matchSearch;
+  });
+  return(
+    <div>
+      <div className="section-header">
+        <span className="section-title">📦 {t.inventory}</span>
+        <div style={{display:'flex',gap:8}}>
+          <input className="search-bar" placeholder={t.search} value={search} onChange={e=>setSearch(e.target.value)} style={{width:160}}/>
+          <button className="btn btn-primary">+ {t.newItem}</button>
+        </div>
+      </div>
+      <div className="tabs">
+        {cats.map(c=><div key={c} className={`tab${tab===c?' active':''}`} onClick={()=>setTab(c)}>{c==='todos'?'Todos':c}</div>)}
+      </div>
+      <div className="inv-grid">
+        {filtered.map(item=>{
+          const pct=Math.round((item.available/item.total)*100);
+          const barCls=pct>60?'high':pct>30?'med':'low';
+          return(
+            <div className="inv-item" key={item.id}>
+              <div className="inv-item-header">
+                <div>
+                  <div className="inv-item-name">{item.name}</div>
+                  <div className="inv-item-cat">{item.cat} · {item.id}</div>
+                </div>
+                <StatusBadge status={item.available>0?'activo':'atrasado'}/>
+              </div>
+              <div className="inv-bar-wrap"><div className={`inv-bar ${barCls}`} style={{width:`${pct}%`}}/></div>
+              <div className="inv-meta">
+                <span>📦 {item.available}/{item.total} {t.available}</span>
+                <span style={{fontFamily:'JetBrains Mono,monospace',fontWeight:600,color:'#3B82F6'}}>{item.price}</span>
+              </div>
+              <div style={{display:'flex',gap:6,marginTop:8}}>
+                <button className="btn btn-ghost btn-sm" style={{flex:1}}>{t.edit}</button>
+                <button className="btn btn-primary btn-sm" style={{flex:1}}>Rentar</button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── ORDERS MODULE ──────────────────────────────────────────
+function Orders({t}){
+  const [tab,setTab]=useState('todas');
+  const [showModal,setShowModal]=useState(false);
+  const filtered=tab==='todas'?MOCK.orders:MOCK.orders.filter(o=>o.status===tab);
+  return(
+    <div>
+      <div className="section-header">
+        <span className="section-title">📋 {t.orders}</span>
+        <button className="btn btn-primary" onClick={()=>setShowModal(true)}>+ {t.newOrder}</button>
+      </div>
+      <div className="tabs">
+        {['todas','activo','completado','atrasado'].map(s=>(
+          <div key={s} className={`tab${tab===s?' active':''}`} onClick={()=>setTab(s)}>
+            {s==='todas'?'Todas':s.charAt(0).toUpperCase()+s.slice(1)}
+          </div>
+        ))}
+      </div>
+      <div className="card">
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>{t.client}</th><th>{t.type}</th><th>{t.items}</th><th>Inicio</th><th>Fin</th><th>{t.total}</th><th>{t.status}</th><th>{t.actions}</th></tr></thead>
+            <tbody>
+              {filtered.map(o=>(
+                <tr key={o.id}>
+                  <td><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:12,color:'#3B82F6'}}>{o.id}</span></td>
+                  <td>{o.client}</td>
+                  <td><span className="badge badge-purple">{o.type}</span></td>
+                  <td style={{fontSize:12,maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.items}</td>
+                  <td style={{fontFamily:'JetBrains Mono,monospace',fontSize:11,color:'#94A3B8'}}>{o.start}</td>
+                  <td style={{fontFamily:'JetBrains Mono,monospace',fontSize:11,color:'#94A3B8'}}>{o.end}</td>
+                  <td><span style={{fontFamily:'JetBrains Mono,monospace',fontWeight:600}}>{o.total}</span></td>
+                  <td><StatusBadge status={o.status}/></td>
+                  <td>
+                    <div style={{display:'flex',gap:4}}>
+                      <button className="btn btn-ghost btn-sm">{t.edit}</button>
+                      <button className="btn btn-ghost btn-sm">🧾</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {showModal&&(
+        <div className="modal-overlay" onClick={()=>setShowModal(false)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="modal-header">
+              <span className="modal-title">+ {t.newOrder}</span>
+              <button className="modal-close" onClick={()=>setShowModal(false)}>✕</button>
+            </div>
+            <div className="form-row">
+              <div className="form-group"><label className="form-label">{t.client}</label><select className="form-select">{MOCK.clients.map(c=><option key={c.id}>{c.name}</option>)}</select></div>
+              <div className="form-group"><label className="form-label">{t.type}</label><select className="form-select"><option>Renta</option><option>Venta</option><option>Servicio</option><option>Envío</option><option>Devolución</option></select></div>
+            </div>
+            <div className="form-row">
+              <div className="form-group"><label className="form-label">Fecha inicio</label><input type="date" className="form-input"/></div>
+              <div className="form-group"><label className="form-label">Fecha fin</label><input type="date" className="form-input"/></div>
+            </div>
+            <div className="form-group" style={{marginBottom:12}}>
+              <label className="form-label">{t.items}</label>
+              <select className="form-select">{MOCK.inventory.map(i=><option key={i.id}>{i.name} — {i.price}</option>)}</select>
+            </div>
+            <div className="form-row">
+              <div className="form-group"><label className="form-label">Cantidad</label><input type="number" className="form-input" defaultValue={1}/></div>
+              <div className="form-group"><label className="form-label">Descuento (%)</label><input type="number" className="form-input" defaultValue={0}/></div>
+            </div>
+            <div className="form-group" style={{marginBottom:16}}>
+              <label className="form-label">Notas</label>
+              <input className="form-input" placeholder="Observaciones opcionales..."/>
+            </div>
+            <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
+              <button className="btn btn-ghost" onClick={()=>setShowModal(false)}>{t.cancel}</button>
+              <button className="btn btn-primary" onClick={()=>setShowModal(false)}>✓ {t.save}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── CLIENTS MODULE ─────────────────────────────────────────
+function Clients({t}){
+  return(
+    <div>
+      <div className="section-header">
+        <span className="section-title">👥 {t.clients}</span>
+        <button className="btn btn-primary">+ {t.newClient}</button>
+      </div>
+      <div className="card">
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>ID</th><th>{t.name}</th><th>{t.type}</th><th>RTN</th><th>{t.phone}</th><th>{t.city}</th><th>{t.totalOrders}</th><th>Acumulado</th><th>{t.status}</th></tr></thead>
+            <tbody>
+              {MOCK.clients.map(c=>(
+                <tr key={c.id}>
+                  <td><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:12,color:'#3B82F6'}}>{c.id}</span></td>
+                  <td style={{fontWeight:600,color:'#F1F5F9'}}>{c.name}</td>
+                  <td><span className="badge badge-purple">{c.type}</span></td>
+                  <td style={{fontFamily:'JetBrains Mono,monospace',fontSize:11,color:'#94A3B8'}}>{c.rtn}</td>
+                  <td style={{fontSize:12}}>{c.phone}</td>
+                  <td style={{fontSize:12,color:'#94A3B8'}}>{c.city}</td>
+                  <td style={{fontFamily:'JetBrains Mono,monospace',textAlign:'center'}}>{c.orders}</td>
+                  <td style={{fontFamily:'JetBrains Mono,monospace',fontWeight:600,color:'#10B981'}}>{c.total}</td>
+                  <td><StatusBadge status={c.status}/></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── REPORTS MODULE ─────────────────────────────────────────
+function Reports({t}){
+  const monthlyData=[
+    {m:'Ene',rentas:420000,ventas:85000,servicios:115000},
+    {m:'Feb',rentas:380000,ventas:92000,servicios:108000},
+    {m:'Mar',rentas:510000,ventas:98000,servicios:102000},
+    {m:'Abr',rentas:480000,ventas:88000,servicios:122000},
+    {m:'May',rentas:530000,ventas:105000,servicios:115000},
+    {m:'Jun',rentas:612320,ventas:118000,servicios:117000},
+  ];
+  return(
+    <div>
+      <div className="section-header"><span className="section-title">📊 {t.reports}</span>
+        <div style={{display:'flex',gap:8}}>
+          <select className="form-select" style={{fontSize:12,padding:'6px 10px'}}>
+            <option>Junio 2024</option><option>Mayo 2024</option><option>Trimestre Q2</option>
+          </select>
+          <button className="btn btn-ghost btn-sm">⬇ Exportar Excel</button>
+        </div>
+      </div>
+      <div className="grid-4" style={{marginBottom:16}}>
+        {[
+          {label:'Ingresos totales',val:'L 847,320',icon:'💰',color:'#10B981'},
+          {label:'Costo operativo',val:'L 312,400',icon:'⚙️',color:'#F59E0B'},
+          {label:'Utilidad neta',val:'L 534,920',icon:'📈',color:'#3B82F6'},
+          {label:'Margen neto',val:'63.1%',icon:'🎯',color:'#8B5CF6'},
+        ].map((s,i)=>(
+          <div className="card" key={i} style={{borderColor:s.color+'33'}}>
+            <div className="card-header"><span className="card-title">{s.label}</span><span>{s.icon}</span></div>
+            <div className="stat-value" style={{color:s.color,fontSize:22}}>{s.val}</div>
+          </div>
+        ))}
+      </div>
+      <div className="card">
+        <div className="card-header"><span className="card-title">Ingresos por segmento — 6 meses</span></div>
+        <div style={{height:240}}>
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={monthlyData} barGap={2}>
+              <XAxis dataKey="m" tick={{fill:'#475569',fontSize:11}} axisLine={false} tickLine={false}/>
+              <YAxis tick={{fill:'#475569',fontSize:10}} axisLine={false} tickLine={false} tickFormatter={v=>`L${(v/1000).toFixed(0)}k`}/>
+              <Tooltip contentStyle={{background:'#111827',border:'1px solid #1E293B',borderRadius:8,fontSize:12}} formatter={v=>[`L ${v.toLocaleString()}`,'']}/>
+              <Bar dataKey="rentas" fill="#3B82F6" radius={[4,4,0,0]} name="Rentas"/>
+              <Bar dataKey="ventas" fill="#10B981" radius={[4,4,0,0]} name="Ventas"/>
+              <Bar dataKey="servicios" fill="#8B5CF6" radius={[4,4,0,0]} name="Servicios"/>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div style={{display:'flex',gap:16,marginTop:8,justifyContent:'center'}}>
+          {[['Rentas','#3B82F6'],['Ventas','#10B981'],['Servicios','#8B5CF6']].map(([l,c])=>(
+            <div key={l} style={{display:'flex',alignItems:'center',gap:6,fontSize:12,color:'#94A3B8'}}>
+              <div style={{width:10,height:10,borderRadius:2,background:c}}/>
+              {l}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── INTEGRATIONS MODULE ────────────────────────────────────
+function Integrations({t}){
+  const [states,setStates]=useState(()=>Object.fromEntries(MOCK.integrations.map(i=>[i.id,i.connected])));
+  const cats=[...new Set(MOCK.integrations.map(i=>i.cat))];
+  return(
+    <div>
+      <div className="section-header">
+        <span className="section-title">🔌 {t.integrations}</span>
+        <button className="btn btn-ghost btn-sm">+ Agregar conector</button>
+      </div>
+      {cats.map(cat=>(
+        <div key={cat} style={{marginBottom:20}}>
+          <div style={{fontSize:11,fontWeight:700,color:'#475569',textTransform:'uppercase',letterSpacing:'.08em',marginBottom:10}}>{cat}</div>
+          <div className="int-grid">
+            {MOCK.integrations.filter(i=>i.cat===cat).map(int=>(
+              <div className="int-card" key={int.id}>
+                <div className="int-header">
+                  <div className="int-logo" style={{background:int.color+'22'}}>{int.icon}</div>
+                  <div>
+                    <div className="int-name">{int.name}</div>
+                    <div style={{fontSize:10,color:'#475569'}}>{int.cat}</div>
+                  </div>
+                </div>
+                <div className="int-desc">{int.desc}</div>
+                <div className="int-status">
+                  <span style={{fontSize:11,color:states[int.id]?'#10B981':'#475569',fontWeight:600}}>
+                    {states[int.id]?'● '+t.connected:'○ '+t.connect}
+                  </span>
+                  <div className={`toggle${states[int.id]?' on':''}`} onClick={()=>setStates(s=>({...s,[int.id]:!s[int.id]}))}/>
+                </div>
+                {states[int.id]&&<button className="btn btn-ghost btn-sm" style={{width:'100%',marginTop:4}}>{t.configure} ⚙</button>}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── AI ASSISTANT MODULE ────────────────────────────────────
+function AIAssistant({t}){
+  const [msgs,setMsgs]=useState([
+    {role:'ai',text:'¡Hola! Soy el asistente interno de NexERP. Puedo consultarte disponibilidad de inventario, analizar finanzas, revisar órdenes activas y darte recomendaciones. ¿En qué te ayudo?'},
+  ]);
+  const [input,setInput]=useState('');
+  const [loading,setLoading]=useState(false);
+  const endRef=useRef(null);
+  useEffect(()=>endRef.current?.scrollIntoView({behavior:'smooth'}),[msgs]);
+
+  const buildContext=()=>`
+Eres el asistente IA interno de NexERP, un ERP para negocios de renta (ARCOHN - andamios) y venta (Nautilus - libros) en Honduras.
+Datos actuales del sistema:
+INVENTARIO: ${JSON.stringify(MOCK.inventory.map(i=>({nombre:i.name,disponible:i.available,total:i.total,precio:i.price})))}
+ÓRDENES ACTIVAS: ${JSON.stringify(MOCK.orders.filter(o=>o.status==='activo'))}
+CLIENTES: ${JSON.stringify(MOCK.clients.map(c=>({nombre:c.name,estado:c.status,acumulado:c.total})))}
+FINANZAS: Ingresos junio L 847,320 | Por cobrar L 124,500 | Margen 63.1%
+Responde en español de forma concisa y útil. Usa emojis cuando ayude a la claridad.`;
+
+  const send=async()=>{
+    if(!input.trim()||loading)return;
+    const userMsg=input.trim();
+    setInput('');
+    setMsgs(m=>[...m,{role:'user',text:userMsg}]);
+    setLoading(true);
+    try{
+      const res=await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          model:'claude-sonnet-4-6',
+          max_tokens:1000,
+          system:buildContext(),
+          messages:[
+            ...msgs.filter(m=>m.role!=='ai'||msgs.indexOf(m)===0).slice(-6).map(m=>({
+              role:m.role==='user'?'user':'assistant',
+              content:m.text
+            })),
+            {role:'user',content:userMsg}
+          ]
+        })
+      });
+      const data=await res.json();
+      const reply=data.content?.[0]?.text||'Error al obtener respuesta.';
+      setMsgs(m=>[...m,{role:'ai',text:reply}]);
+    }catch(e){
+      setMsgs(m=>[...m,{role:'ai',text:'⚠️ Error de conexión. Verifica tu API key de Anthropic.'}]);
+    }
+    setLoading(false);
+  };
+
+  const suggestions=['¿Cuántos andamios tubulares disponibles?','¿Qué clientes tienen pagos atrasados?','¿Cuál fue el ingreso de mayo?','Recomienda qué cobrar primero'];
+
+  return(
+    <div style={{height:'calc(100vh - 140px)',display:'flex',flexDirection:'column'}}>
+      <div className="section-header" style={{marginBottom:12}}>
+        <span className="section-title">🤖 {t.ai}</span>
+        <span style={{fontSize:11,color:'#10B981',fontWeight:600}}>● En línea · claude-sonnet-4-6</span>
+      </div>
+      {msgs.length===1&&(
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',marginBottom:12}}>
+          {suggestions.map((s,i)=>(
+            <button key={i} className="btn btn-ghost btn-sm" onClick={()=>{setInput(s);}} style={{fontSize:11}}>{s}</button>
+          ))}
+        </div>
+      )}
+      <div className="card" style={{flex:1,display:'flex',flexDirection:'column',padding:0,overflow:'hidden'}}>
+        <div className="chat-messages" style={{flex:1,overflow:'auto'}}>
+          {msgs.map((m,i)=>(
+            <div key={i} className={`msg msg-${m.role}`}>
+              {m.role==='ai'&&<div className="msg-ai-header">🤖 NexERP AI</div>}
+              <div style={{whiteSpace:'pre-wrap',lineHeight:1.6}}>{m.text}</div>
+            </div>
+          ))}
+          {loading&&(
+            <div className="msg msg-ai">
+              <div className="msg-ai-header">🤖 NexERP AI</div>
+              <div className="ai-thinking">Analizando<span className="dots"><span>.</span><span>.</span><span>.</span></span></div>
+            </div>
+          )}
+          <div ref={endRef}/>
+        </div>
+        <div className="chat-input-area">
+          <textarea
+            className="chat-input"
+            placeholder={t.aiPlaceholder}
+            value={input}
+            onChange={e=>setInput(e.target.value)}
+            onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}}
+            rows={2}
+          />
+          <button className="btn btn-primary" onClick={send} disabled={loading} style={{alignSelf:'flex-end'}}>
+            {loading?'...':`${t.aiSend} ↑`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── BILLING MODULE ─────────────────────────────────────────
+function Billing({t}){
+  return(
+    <div>
+      <div className="section-header">
+        <span className="section-title">💳 {t.billing}</span>
+        <div style={{display:'flex',gap:8}}>
+          <button className="btn btn-ghost btn-sm">⬇ Exportar PDF</button>
+          <button className="btn btn-primary">+ Nueva Factura</button>
+        </div>
+      </div>
+      <div className="grid-3" style={{marginBottom:16}}>
+        {[
+          {label:'Facturado este mes',val:'L 847,320',color:'#3B82F6',icon:'🧾'},
+          {label:'Cobrado',val:'L 722,820',color:'#10B981',icon:'✅'},
+          {label:'Pendiente de cobro',val:'L 124,500',color:'#F59E0B',icon:'⏳'},
+        ].map((s,i)=>(
+          <div className="card" key={i} style={{borderLeft:`3px solid ${s.color}`}}>
+            <div className="card-header"><span className="card-title">{s.label}</span><span>{s.icon}</span></div>
+            <div className="stat-value" style={{color:s.color,fontSize:20}}>{s.val}</div>
+          </div>
+        ))}
+      </div>
+      <div className="card">
+        <div className="card-header"><span className="card-title">Facturas recientes</span></div>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Factura</th><th>{t.client}</th><th>Concepto</th><th>Emitida</th><th>Vence</th><th>Monto</th><th>{t.status}</th><th>Pago</th></tr></thead>
+            <tbody>
+              {MOCK.orders.map((o,i)=>(
+                <tr key={i}>
+                  <td><span style={{fontFamily:'JetBrains Mono,monospace',fontSize:12,color:'#3B82F6'}}>FAC-{2200+i}</span></td>
+                  <td>{o.client}</td>
+                  <td style={{fontSize:12}}>{o.type} — {o.items.slice(0,25)}...</td>
+                  <td style={{fontFamily:'JetBrains Mono,monospace',fontSize:11,color:'#94A3B8'}}>{o.start}</td>
+                  <td style={{fontFamily:'JetBrains Mono,monospace',fontSize:11,color:'#94A3B8'}}>{o.end==='—'?o.start:o.end}</td>
+                  <td style={{fontFamily:'JetBrains Mono,monospace',fontWeight:600}}>{o.total}</td>
+                  <td><StatusBadge status={o.status}/></td>
+                  <td>
+                    <div style={{display:'flex',gap:4}}>
+                      <span style={{fontSize:10,color:'#94A3B8'}}>Pixel Pay</span>
+                      <button className="btn btn-ghost btn-sm" style={{padding:'2px 6px',fontSize:10}}>🧾</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── APP ROOT ───────────────────────────────────────────────
+function App(){
+  const [lang,setLang]=useState('es');
+  const [module,setModule]=useState('dashboard');
+  const [collapsed,setCollapsed]=useState(false);
+  const t=T[lang];
+
+  const navItems=[
+    {id:'dashboard',icon:'⬛',label:t.dashboard,section:'principal'},
+    {id:'inventory',icon:'📦',label:t.inventory,section:'operaciones'},
+    {id:'orders',icon:'📋',label:t.orders,badge:'143',section:'operaciones'},
+    {id:'clients',icon:'👥',label:t.clients,section:'operaciones'},
+    {id:'billing',icon:'💳',label:t.billing,section:'operaciones'},
+    {id:'reports',icon:'📊',label:t.reports,section:'analítica'},
+    {id:'ai',icon:'🤖',label:t.ai,section:'analítica'},
+    {id:'integrations',icon:'🔌',label:t.integrations,section:'sistema'},
+  ];
+
+  const sections=[...new Set(navItems.map(n=>n.section))];
+
+  const moduleComponents={
+    dashboard:<Dashboard t={t}/>,
+    inventory:<Inventory t={t}/>,
+    orders:<Orders t={t}/>,
+    clients:<Clients t={t}/>,
+    billing:<Billing t={t}/>,
+    reports:<Reports t={t}/>,
+    ai:<AIAssistant t={t}/>,
+    integrations:<Integrations t={t}/>,
+  };
+
+  const currentTitle=navItems.find(n=>n.id===module)?.label||'';
+
+  return(
+    <div className="app">
+      <div className={`sidebar${collapsed?' collapsed':''}`}>
+        <div className="sidebar-logo">
+          <div className="logo-icon">N</div>
+          {!collapsed&&<div className="logo-text">Nex<span>ERP</span></div>}
+        </div>
+        <div className="sidebar-nav">
+          {sections.map(sec=>(
+            <div key={sec}>
+              <div className="nav-section">{sec}</div>
+              {navItems.filter(n=>n.section===sec).map(n=>(
+                <div key={n.id} className={`nav-item${module===n.id?' active':''}`} onClick={()=>setModule(n.id)} title={collapsed?n.label:''}>
+                  <span className="nav-icon">{n.icon}</span>
+                  {!collapsed&&<span className="nav-label">{n.label}</span>}
+                  {!collapsed&&n.badge&&<span className="nav-badge">{n.badge}</span>}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+        <div className="sidebar-footer">
+          <div className="user-card">
+            <div className="user-avatar">G</div>
+            {!collapsed&&<div className="user-info"><div className="user-name">Gabu — ARCOHN</div><div className="user-role">Admin</div></div>}
+          </div>
+        </div>
+      </div>
+      <div className="main">
+        <div className="topbar">
+          <button className="btn btn-ghost btn-sm" onClick={()=>setCollapsed(c=>!c)} style={{padding:'4px 8px'}}>{collapsed?'▶':'◀'}</button>
+          <span className="topbar-title">{currentTitle}</span>
+          <div className="topbar-actions">
+            <input className="search-bar" placeholder={t.search}/>
+            <button className="lang-toggle" onClick={()=>setLang(l=>l==='es'?'en':'es')}>
+              {lang==='es'?'🌐 EN':'🌐 ES'}
+            </button>
+            <div className="notif-btn">🔔<div className="notif-dot"/></div>
+          </div>
+        </div>
+        <div className="content">
+          {moduleComponents[module]}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
