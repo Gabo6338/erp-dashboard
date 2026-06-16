@@ -156,6 +156,259 @@ function renderReports(){
   },80);
 }
 
+
+// ── HISTORY LOG ───────────────────────────────────────────
+let historyLog = [
+  {type:'sale',icon:'🛒',title:'Venta: El Aleph x3',sub:'Pedro Martínez · Pedido ORD-2104',time:'10 Jun 2024 · 14:32',user:'Gabu'},
+  {type:'sub', icon:'📤',title:'Salida: Andamio Tubular x40',sub:'Renta ORD-2106 — Avance MSP',time:'01 Jun 2024 · 08:00',user:'Gabu'},
+  {type:'add', icon:'📥',title:'Entrada: Tablón de Madera x50',sub:'Reposición de inventario',time:'28 May 2024 · 10:15',user:'Gabu'},
+  {type:'edit',icon:'✏️',title:'Edición: Andamio Marco',sub:'Precio actualizado: L 850 → L 900/mes',time:'25 May 2024 · 09:41',user:'Gabu'},
+  {type:'sale',icon:'🛒',title:'Venta: Libros UNAH x20',sub:'UNAH Librería · Pedido ORD-2103',time:'08 Jun 2024 · 11:20',user:'Gabu'},
+  {type:'sub', icon:'📤',title:'Salida: Andamio Marco x60',sub:'Renta ORD-2101 — Alcaldía Ojojona',time:'01 May 2024 · 07:00',user:'Gabu'},
+];
+let historyFilter = 'all';
+
+function addHistoryEntry(type, icon, title, sub, user){
+  const now = new Date();
+  const time = now.toLocaleDateString('es-HN',{day:'2-digit',month:'short',year:'numeric'}) + ' · ' + now.toLocaleTimeString('es-HN',{hour:'2-digit',minute:'2-digit'});
+  historyLog.unshift({type,icon,title,sub,time,user:user||currentUserName||'Sistema'});
+}
+
+function filterHistory(val){ historyFilter=val; renderHistory(); }
+
+function renderHistory(){
+  const list = document.getElementById('history-list');
+  if(!list) return;
+  const filtered = historyFilter==='all' ? historyLog : historyLog.filter(h=>h.type===historyFilter);
+  if(filtered.length===0){ list.innerHTML='<div style="padding:24px;text-align:center;color:var(--text3);font-size:13px">No hay movimientos registrados.</div>'; return; }
+  list.innerHTML = filtered.map(h=>`
+    <div class="hist-item">
+      <div class="hist-icon ${h.type}">${h.icon}</div>
+      <div class="hist-info">
+        <div class="hist-title">${h.title}</div>
+        <div class="hist-sub">${h.sub} · <strong>${h.user}</strong></div>
+      </div>
+      <div class="hist-time">${h.time}</div>
+    </div>`).join('');
+}
+
+// ── EDIT INVENTORY MODAL ──────────────────────────────────
+function openEditInv(id){
+  const item = DATA.inventory.find(i=>i.id===id);
+  if(!item) return;
+  document.getElementById('ei-id').value = item.id;
+  document.getElementById('ei-name').value = item.name;
+  document.getElementById('ei-total').value = item.total;
+  document.getElementById('ei-available').value = item.available;
+  document.getElementById('ei-price').value = item.price.replace('L ','');
+  const catSel = document.getElementById('ei-cat');
+  for(let o of catSel.options) if(o.value===item.cat) o.selected=true;
+  document.getElementById('suc-edit-inv').style.display='none';
+  openModal('modal-edit-inv');
+}
+function saveEditInv(){
+  const id = document.getElementById('ei-id').value;
+  const item = DATA.inventory.find(i=>i.id===id);
+  if(!item) return;
+  const oldTotal = item.total;
+  const newTotal = parseInt(document.getElementById('ei-total').value)||item.total;
+  const newAvail = parseInt(document.getElementById('ei-available').value);
+  const reason = document.getElementById('ei-reason').value;
+  const diff = newTotal - oldTotal;
+  item.name = document.getElementById('ei-name').value;
+  item.cat  = document.getElementById('ei-cat').value;
+  item.total = newTotal;
+  item.available = isNaN(newAvail) ? item.available : newAvail;
+  item.price = 'L ' + document.getElementById('ei-price').value;
+  if(diff>0) addHistoryEntry('add','📥',`Entrada: ${item.name} +${diff}`,reason);
+  else if(diff<0) addHistoryEntry('sub','📤',`Salida: ${item.name} ${diff}`,reason);
+  else addHistoryEntry('edit','✏️',`Edición: ${item.name}`,reason);
+  document.getElementById('suc-edit-inv').style.display='block';
+  setTimeout(()=>{ closeModal('modal-edit-inv'); renderInv(); },1000);
+}
+
+// ── EDIT ORDER MODAL ──────────────────────────────────────
+function openEditOrder(id){
+  const order = DATA.orders.find(o=>o.id===id);
+  if(!order) return;
+  document.getElementById('eo-id').value = order.id;
+  document.getElementById('eo-client').value = order.client;
+  document.getElementById('eo-items').value = order.items;
+  document.getElementById('eo-total').value = order.total;
+  document.getElementById('eo-start').value = order.start;
+  document.getElementById('eo-end').value = order.end==='—'?'':order.end;
+  const st = document.getElementById('eo-status');
+  for(let o of st.options) o.selected = o.value===order.status;
+  document.getElementById('suc-edit-order').style.display='none';
+  openModal('modal-edit-order');
+}
+function saveEditOrder(){
+  const id = document.getElementById('eo-id').value;
+  const order = DATA.orders.find(o=>o.id===id);
+  if(!order) return;
+  order.status = document.getElementById('eo-status').value;
+  order.start  = document.getElementById('eo-start').value;
+  order.end    = document.getElementById('eo-end').value||'—';
+  order.total  = document.getElementById('eo-total').value;
+  order.items  = document.getElementById('eo-items').value;
+  addHistoryEntry('edit','✏️',`Orden editada: ${id}`,`Estado → ${order.status} · ${order.client}`);
+  document.getElementById('suc-edit-order').style.display='block';
+  setTimeout(()=>{ closeModal('modal-edit-order'); renderOrders(); },1000);
+}
+
+// ── CLIENT PROFILE ────────────────────────────────────────
+let currentClientId = null;
+function openClientProfile(id){
+  const c = DATA.clients.find(x=>x.id===id);
+  if(!c) return;
+  currentClientId = id;
+  document.getElementById('cp-breadname').textContent = c.name;
+  document.getElementById('cp-name').textContent = c.name;
+  document.getElementById('cp-avatar').textContent = c.name.charAt(0).toUpperCase();
+  document.getElementById('cp-meta').textContent = `${c.type} · ${c.city||'—'} · ${c.phone||'—'}`;
+  document.getElementById('cp-stat-orders').textContent = c.orders;
+  document.getElementById('cp-stat-total').textContent = c.total;
+  document.getElementById('cp-stat-status').innerHTML = `<span class="badge ${c.status==='activo'?'bg':c.status==='moroso'?'ba':'br'}">${c.status}</span>`;
+
+  // Info grid
+  document.getElementById('cp-info-grid').innerHTML = [
+    {l:'Tipo de cliente',v:c.type},{l:'RTN / DNI',v:c.rtn||'—'},
+    {l:'Teléfono',v:c.phone||'—'},{l:'Correo',v:c.email||'—'},
+    {l:'Ciudad',v:c.city||'—'},{l:'Departamento',v:c.dept||'—'},
+    {l:'Dirección',v:c.addr||'—'},{l:'Coordenadas GPS',v:(c.lat&&c.lng)?`${c.lat}, ${c.lng}`:'—'},
+    {l:'Órdenes totales',v:c.orders},{l:'Acumulado facturado',v:c.total},
+  ].map(r=>`<div class="info-row"><div class="info-lbl">${r.l}</div><div class="info-val">${r.v}</div></div>`).join('');
+
+  // Orders
+  const cOrders = DATA.orders.filter(o=>o.client===c.name);
+  document.getElementById('cp-orders-table').innerHTML = cOrders.length ? `<table><thead><tr>
+    <th>#</th><th>Tipo</th><th>Ítems</th><th>Recoge</th><th>Devuelve</th><th>Total</th><th>Estado del pago</th>
+  </tr></thead><tbody>${cOrders.map(o=>`<tr>
+    <td><span class="mono">${o.id}</span></td>
+    <td><span class="badge bp">${o.type}</span></td>
+    <td style="font-size:12px">${o.items}</td>
+    <td style="font-family:var(--mono);font-size:11px;color:var(--text2)">${o.start}</td>
+    <td style="font-family:var(--mono);font-size:11px;color:var(--text2)">${o.end}</td>
+    <td><span style="font-family:var(--mono);font-weight:600">${o.total}</span></td>
+    <td><span class="badge ${o.status==='completado'?'bg':o.status==='atrasado'?'br':'bb'}">${o.status==='completado'?'Pagado':o.status==='atrasado'?'Atrasado':'Activo'}</span></td>
+  </tr>`).join('')}</tbody></table>` : '<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Sin órdenes registradas.</div>';
+
+  // Billing
+  const cBilling = DATA.billing.filter(b=>b.client===c.name);
+  document.getElementById('cp-billing-table').innerHTML = cBilling.length ? `<table><thead><tr>
+    <th>Factura</th><th>Concepto</th><th>Fecha</th><th>Monto</th><th>Estado</th><th>Pago</th>
+  </tr></thead><tbody>${cBilling.map(b=>`<tr>
+    <td><span class="mono">${b.fac}</span></td>
+    <td style="font-size:12px">${b.items.substring(0,40)}</td>
+    <td style="font-family:var(--mono);font-size:11px;color:var(--text2)">${b.start}</td>
+    <td><span style="font-family:var(--mono);font-weight:600">${b.total}</span></td>
+    <td>${b.status==='completado'?'<span class="badge bg">Pagado</span>':b.status==='atrasado'?'<span class="badge br">Atrasado</span>':'<span class="badge bb">Activo</span>'}</td>
+    <td style="font-size:11px;color:var(--text2)">${b.pay}</td>
+  </tr>`).join('')}</tbody></table>` : '<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px">Sin facturas registradas.</div>';
+
+  // Reset tabs
+  document.querySelectorAll('.cp-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.cp-tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelector('.cp-tab').classList.add('active');
+  document.getElementById('cpt-info').classList.add('active');
+
+  document.getElementById('client-profile').style.display='block';
+}
+function closeClientProfile(){
+  document.getElementById('client-profile').style.display='none';
+}
+function cpTab(tab, btn){
+  document.querySelectorAll('.cp-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.cp-tab-panel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('cpt-'+tab).classList.add('active');
+}
+
+// ── GLOBAL SEARCH ─────────────────────────────────────────
+function openSearchOverlay(){
+  document.getElementById('search-overlay').classList.add('show');
+  setTimeout(()=>document.getElementById('search-main-inp').focus(),100);
+}
+function closeSearchOverlay(){
+  document.getElementById('search-overlay').classList.remove('show');
+  document.getElementById('search-main-inp').value='';
+  document.getElementById('search-results-list').innerHTML='<div class="search-empty">Escribe para buscar en todo el sistema...</div>';
+}
+function closeSearch(e){ if(e.target.id==='search-overlay') closeSearchOverlay(); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') closeSearchOverlay(); });
+
+function runSearch(q){
+  const list = document.getElementById('search-results-list');
+  if(!q.trim()){ list.innerHTML='<div class="search-empty">Escribe para buscar en todo el sistema...</div>'; return; }
+  const ql = q.toLowerCase();
+  let results = [];
+  DATA.clients.filter(c=>c.name.toLowerCase().includes(ql)||c.rtn?.includes(ql)||c.phone?.includes(ql))
+    .forEach(c=>results.push({icon:'👥',title:c.name,sub:`${c.type} · ${c.city} · ${c.total}`,badge:'Cliente',action:()=>{ closeSearchOverlay(); renderClients(); goTo('clients'); setTimeout(()=>openClientProfile(c.id),200); }}));
+  DATA.orders.filter(o=>o.id.toLowerCase().includes(ql)||o.client.toLowerCase().includes(ql)||o.items.toLowerCase().includes(ql))
+    .forEach(o=>results.push({icon:'📋',title:o.id+' — '+o.client,sub:o.items+' · '+o.total,badge:'Orden',action:()=>{ closeSearchOverlay(); goTo('orders'); }}));
+  DATA.inventory.filter(i=>i.name.toLowerCase().includes(ql)||i.cat.toLowerCase().includes(ql))
+    .forEach(i=>results.push({icon:'📦',title:i.name,sub:`${i.cat} · ${i.available}/${i.total} disp. · ${i.price}`,badge:'Inventario',action:()=>{ closeSearchOverlay(); goTo('inventory'); }}));
+  DATA.billing.filter(b=>b.fac?.toLowerCase().includes(ql)||b.client.toLowerCase().includes(ql))
+    .forEach(b=>results.push({icon:'🧾',title:b.fac+' — '+b.client,sub:b.total+' · '+b.status,badge:'Factura',action:()=>{ closeSearchOverlay(); goTo('billing'); }}));
+
+  if(results.length===0){ list.innerHTML='<div class="search-empty">Sin resultados para "'+q+'"</div>'; return; }
+  list.innerHTML = results.slice(0,8).map((r,i)=>`
+    <div class="search-result" onclick="searchResults[${i}].action()">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span>${r.icon}</span>
+        <div style="flex:1">
+          <div class="search-result-title">${r.title}<span class="search-result-badge">${r.badge}</span></div>
+          <div class="search-result-sub">${r.sub}</div>
+        </div>
+      </div>
+    </div>`).join('');
+  window.searchResults = results;
+}
+
+// ── LANGUAGE TOGGLE ───────────────────────────────────────
+const LANG_MAP = {
+  'Panel Principal':'Dashboard','Inventario':'Inventory','Órdenes':'Orders',
+  'Clientes':'Clients','Facturación':'Billing','Reportes':'Reports',
+  'Asistente IA':'AI Assistant','Integraciones':'Integrations',
+  'Historial de cambios':'Change History','Buscar...':'Search...',
+  'Nuevo cliente':'New client','Nueva orden':'New order','Nueva factura':'New invoice',
+  'Agregar ítem':'Add item','Todos':'All','Activo':'Active','Completado':'Completed',
+  'Atrasado':'Delayed','Moroso':'Delinquent','Editar':'Edit','Salir':'Logout',
+  'Andamios':'Scaffolding','Literatura':'Literature','Accesorios':'Accessories',
+};
+const LANG_MAP_REV = Object.fromEntries(Object.entries(LANG_MAP).map(([k,v])=>[v,k]));
+
+function toggleLang(){
+  lang = lang==='es'?'en':'es';
+  document.getElementById('lang-btn').textContent = lang==='es'?'🌐 EN':'🌐 ES';
+  const map = lang==='en' ? LANG_MAP : LANG_MAP_REV;
+  function translateNode(node){
+    if(node.nodeType===3){
+      const t=node.textContent.trim();
+      if(map[t]) node.textContent = node.textContent.replace(t, map[t]);
+    } else if(node.nodeType===1 && !['SCRIPT','STYLE','INPUT','SELECT','TEXTAREA'].includes(node.tagName)){
+      node.childNodes.forEach(translateNode);
+    }
+  }
+  translateNode(document.getElementById('snav'));
+  translateNode(document.getElementById('topbar-title'));
+}
+
+// override goTo to also render history
+const _origGoTo = goTo;
+function goTo(id){
+  _origGoTo(id);
+  if(id==='history') renderHistory();
+}
+
+// store current user name
+let currentUserName = 'Gabu';
+const _origLogin = doLogin;
+function doLogin(){
+  _origLogin();
+  currentUserName = document.getElementById('l-name').value.trim() || 'Gabu';
+}
+
 </script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
@@ -352,6 +605,57 @@ tbody td:first-child{color:var(--text);font-weight:500;}
 .toggle.on{background:var(--green);}
 .toggle::after{content:'';position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left .2s;}
 .toggle.on::after{left:18px;}
+
+/* CLIENT PROFILE PAGE */
+#client-profile{display:none;position:fixed;inset:0;background:var(--bg);z-index:500;overflow-y:auto;}
+.cp-topbar{height:52px;border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 20px;gap:12px;background:var(--surface);position:sticky;top:0;z-index:10;}
+.cp-breadcrumb{font-size:13px;color:var(--text2);display:flex;align-items:center;gap:6px;}
+.cp-breadcrumb a{color:var(--blue);cursor:pointer;text-decoration:none;}
+.cp-body{padding:24px;max-width:1100px;margin:0 auto;}
+.cp-header{display:flex;align-items:center;gap:16px;margin-bottom:24px;}
+.cp-avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0;}
+.cp-name{font-size:22px;font-weight:800;}
+.cp-meta{font-size:13px;color:var(--text2);margin-top:2px;}
+.cp-tabs{display:flex;border-bottom:1px solid var(--border);margin-bottom:20px;gap:0;}
+.cp-tab{padding:10px 18px;font-size:13px;font-weight:500;cursor:pointer;color:var(--text2);border-bottom:2px solid transparent;transition:all .15s;}
+.cp-tab.active{color:var(--blue);border-bottom-color:var(--blue);}
+.cp-tab-panel{display:none;}
+.cp-tab-panel.active{display:block;}
+.info-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+.info-row{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.info-lbl{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;}
+.info-val{font-size:14px;font-weight:500;color:var(--text);}
+
+/* HISTORY */
+.hist-item{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid var(--border);}
+.hist-icon{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
+.hist-icon.add{background:rgba(16,185,129,.15);}
+.hist-icon.sub{background:rgba(239,68,68,.15);}
+.hist-icon.edit{background:rgba(59,130,246,.15);}
+.hist-icon.sale{background:rgba(139,92,246,.15);}
+.hist-info{flex:1;}
+.hist-title{font-size:13px;font-weight:600;color:var(--text);}
+.hist-sub{font-size:11px;color:var(--text2);margin-top:2px;}
+.hist-time{font-size:11px;color:var(--text3);white-space:nowrap;}
+
+/* SEARCH OVERLAY */
+#search-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:900;backdrop-filter:blur(4px);align-items:flex-start;justify-content:center;padding-top:80px;}
+#search-overlay.show{display:flex;}
+.search-box{background:var(--surface);border:1px solid var(--border2);border-radius:16px;width:600px;max-width:90vw;overflow:hidden;}
+.search-input-wrap{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border);}
+.search-input-wrap span{font-size:18px;color:var(--text3);}
+#search-main-inp{flex:1;background:transparent;border:none;color:var(--text);font-size:15px;font-family:'Inter',sans-serif;outline:none;}
+.search-results{max-height:400px;overflow-y:auto;padding:8px;}
+.search-result{padding:10px 12px;border-radius:8px;cursor:pointer;transition:background .1s;}
+.search-result:hover{background:var(--surface2);}
+.search-result-title{font-size:13px;font-weight:600;color:var(--text);}
+.search-result-sub{font-size:11px;color:var(--text2);margin-top:2px;}
+.search-result-badge{font-size:10px;background:var(--surface2);color:var(--text3);padding:1px 6px;border-radius:4px;margin-left:6px;}
+.search-empty{padding:24px;text-align:center;color:var(--text3);font-size:13px;}
+
+/* EDIT MODAL */
+.edit-section{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 8px;}
+
 </style>
 </head>
 <body>
@@ -415,7 +719,7 @@ tbody td:first-child{color:var(--text);font-weight:500;}
       <button class="t-btn" onclick="toggleSidebar()" style="padding:5px 9px;font-size:16px">☰</button>
       <span id="topbar-title">Panel Principal</span>
       <div style="flex:1"></div>
-      <input class="t-search" placeholder="Buscar..."/>
+      <input class="t-search" placeholder="🔍 Buscar..." onclick="openSearchOverlay()" readonly style="cursor:pointer"/>
       <button class="t-btn" onclick="toggleLang()" id="lang-btn">🌐 EN</button>
       <div class="notif">🔔<div class="notif-dot"></div></div>
       <button class="t-btn btn-s" onclick="doLogout()" style="color:var(--red);border-color:rgba(239,68,68,.3)">Salir</button>
@@ -584,6 +888,29 @@ tbody td:first-child{color:var(--text);font-weight:500;}
         </div>
       </div>
 
+      <!-- HISTORY -->
+      <div class="module" id="mod-history">
+        <div class="sec-h">
+          <span class="sec-t">📜 Historial de cambios</span>
+          <button class="btn btn-g btn-s" onclick="exportCSV('history')">⬇ Exportar CSV</button>
+        </div>
+        <div class="card">
+          <div class="c-head">
+            <span class="c-title">Movimientos registrados</span>
+            <div style="display:flex;gap:6px;">
+              <select class="f-sel" style="font-size:12px;padding:4px 8px;width:auto" onchange="filterHistory(this.value)">
+                <option value="all">Todos los tipos</option>
+                <option value="add">Adiciones</option>
+                <option value="sub">Sustracciones</option>
+                <option value="sale">Ventas</option>
+                <option value="edit">Ediciones</option>
+              </select>
+            </div>
+          </div>
+          <div id="history-list"></div>
+        </div>
+      </div>
+
       <!-- INTEGRATIONS -->
       <div class="module" id="mod-integrations">
         <div class="sec-h">
@@ -595,7 +922,128 @@ tbody td:first-child{color:var(--text);font-weight:500;}
 
     </div>
   </div>
+
+<!-- CLIENT PROFILE -->
+<div id="client-profile">
+  <div class="cp-topbar">
+    <button class="t-btn" onclick="closeClientProfile()" style="padding:5px 10px">← Volver</button>
+    <div class="cp-breadcrumb">
+      <a onclick="closeClientProfile()">Clientes</a>
+      <span>›</span>
+      <span id="cp-breadname">—</span>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn btn-p btn-s" onclick="openModal('modal-order')">+ Nueva orden</button>
+  </div>
+  <div class="cp-body">
+    <div class="cp-header">
+      <div class="cp-avatar" id="cp-avatar">?</div>
+      <div>
+        <div class="cp-name" id="cp-name">—</div>
+        <div class="cp-meta" id="cp-meta">—</div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px;">
+        <div class="card" style="padding:12px 20px;text-align:center;min-width:100px;">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;font-weight:600;margin-bottom:4px;">Órdenes</div>
+          <div style="font-size:20px;font-weight:700;font-family:var(--mono)" id="cp-stat-orders">0</div>
+        </div>
+        <div class="card" style="padding:12px 20px;text-align:center;min-width:120px;">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;font-weight:600;margin-bottom:4px;">Acumulado</div>
+          <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--green)" id="cp-stat-total">L 0</div>
+        </div>
+        <div class="card" style="padding:12px 20px;text-align:center;min-width:100px;">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;font-weight:600;margin-bottom:4px;">Estado</div>
+          <div style="margin-top:4px;" id="cp-stat-status"></div>
+        </div>
+      </div>
+    </div>
+    <div class="cp-tabs">
+      <div class="cp-tab active" onclick="cpTab('info',this)">Información</div>
+      <div class="cp-tab" onclick="cpTab('pedidos',this)">Pedidos</div>
+      <div class="cp-tab" onclick="cpTab('facturas',this)">Facturas</div>
+    </div>
+    <!-- INFO -->
+    <div class="cp-tab-panel active" id="cpt-info">
+      <div class="info-grid" id="cp-info-grid"></div>
+    </div>
+    <!-- PEDIDOS -->
+    <div class="cp-tab-panel" id="cpt-pedidos">
+      <div class="t-wrap" id="cp-orders-table"></div>
+    </div>
+    <!-- FACTURAS -->
+    <div class="cp-tab-panel" id="cpt-facturas">
+      <div class="t-wrap" id="cp-billing-table"></div>
+    </div>
+  </div>
 </div>
+
+<!-- SEARCH OVERLAY -->
+<div id="search-overlay" onclick="closeSearch(event)">
+  <div class="search-box" onclick="event.stopPropagation()">
+    <div class="search-input-wrap">
+      <span>🔍</span>
+      <input id="search-main-inp" placeholder="Buscar clientes, órdenes, inventario..." oninput="runSearch(this.value)" autofocus/>
+      <button class="t-btn btn-s" onclick="closeSearchOverlay()">ESC</button>
+    </div>
+    <div class="search-results" id="search-results-list">
+      <div class="search-empty">Escribe para buscar en todo el sistema...</div>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT INVENTORY MODAL -->
+<div class="overlay" id="modal-edit-inv">
+  <div class="modal">
+    <div class="m-head"><span class="m-title">✏️ Editar Ítem</span><button class="m-close" onclick="closeModal('modal-edit-inv')">✕</button></div>
+    <div class="success-msg" id="suc-edit-inv">✓ Ítem actualizado.</div>
+    <div class="f-row">
+      <div class="f-grp"><label class="f-lbl">Nombre</label><input class="f-in" id="ei-name"/></div>
+      <div class="f-grp"><label class="f-lbl">Categoría</label>
+        <select class="f-sel" id="ei-cat"><option>Andamios</option><option>Accesorios</option><option>Literatura</option><option>Universitario</option><option>Otro</option></select></div>
+    </div>
+    <div class="f-row">
+      <div class="f-grp"><label class="f-lbl">Cantidad total</label><input type="number" class="f-in" id="ei-total" min="1"/></div>
+      <div class="f-grp"><label class="f-lbl">Disponibles</label><input type="number" class="f-in" id="ei-available" min="0"/></div>
+    </div>
+    <div class="f-row">
+      <div class="f-grp"><label class="f-lbl">Precio</label><input class="f-in" id="ei-price" placeholder="L 800/mes"/></div>
+      <div class="f-grp"><label class="f-lbl">Motivo del cambio</label>
+        <select class="f-sel" id="ei-reason"><option>Ajuste de inventario</option><option>Ingreso de mercancía</option><option>Daño / pérdida</option><option>Corrección de datos</option><option>Otro</option></select></div>
+    </div>
+    <input type="hidden" id="ei-id"/>
+    <div class="m-footer">
+      <button class="btn btn-g" onclick="closeModal('modal-edit-inv')">Cancelar</button>
+      <button class="btn btn-p" onclick="saveEditInv()">✓ Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- EDIT ORDER MODAL -->
+<div class="overlay" id="modal-edit-order">
+  <div class="modal">
+    <div class="m-head"><span class="m-title">✏️ Editar Orden</span><button class="m-close" onclick="closeModal('modal-edit-order')">✕</button></div>
+    <div class="success-msg" id="suc-edit-order">✓ Orden actualizada.</div>
+    <div class="f-row">
+      <div class="f-grp"><label class="f-lbl">Cliente</label><input class="f-in" id="eo-client" readonly style="opacity:.7"/></div>
+      <div class="f-grp"><label class="f-lbl">Estado</label>
+        <select class="f-sel" id="eo-status"><option value="activo">Activo</option><option value="completado">Completado</option><option value="atrasado">Atrasado</option></select></div>
+    </div>
+    <div class="f-row">
+      <div class="f-grp"><label class="f-lbl">Fecha inicio</label><input type="date" class="f-in" id="eo-start"/></div>
+      <div class="f-grp"><label class="f-lbl">Fecha fin</label><input type="date" class="f-in" id="eo-end"/></div>
+    </div>
+    <div class="f-row">
+      <div class="f-grp"><label class="f-lbl">Total (L)</label><input class="f-in" id="eo-total" placeholder="L 0"/></div>
+      <div class="f-grp"><label class="f-lbl">Ítems</label><input class="f-in" id="eo-items"/></div>
+    </div>
+    <input type="hidden" id="eo-id"/>
+    <div class="m-footer">
+      <button class="btn btn-g" onclick="closeModal('modal-edit-order')">Cancelar</button>
+      <button class="btn btn-p" onclick="saveEditOrder()">✓ Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- MODAL: NUEVA ORDEN -->
 <div class="overlay" id="modal-order">
@@ -857,6 +1305,7 @@ const NAV=[
   {id:'reports',icon:'📊',label:'Reportes',section:'Analítica'},
   {id:'ai',icon:'🤖',label:'Asistente IA',section:'Analítica'},
   {id:'integrations',icon:'🔌',label:'Integraciones',section:'Sistema'},
+  {id:'history',icon:'📜',label:'Historial de cambios',section:'Sistema'},
 ];
 function buildNav(){
   const nav=document.getElementById('snav');
@@ -1076,7 +1525,7 @@ function renderInv(){
         <span style="font-family:var(--mono);color:var(--blue);font-weight:600">${item.price}</span>
       </div>
       <div style="display:flex;gap:6px;margin-top:10px">
-        <button class="btn btn-g btn-s" style="flex:1">Editar</button>
+        <button class="btn btn-g btn-s" style="flex:1" onclick="openEditInv('${item.id}')">✏️ Editar</button>
         <button class="${item.cat==='Literatura'||item.cat==='Universitario'?'btn btn-grn btn-s':'btn btn-p btn-s'}" style="flex:1">${item.cat==='Literatura'||item.cat==='Universitario'?'🛒 Vender':'🏗 Rentar'}</button>
       </div>
     </div>`;}).join('');
@@ -1093,7 +1542,7 @@ function buildOrdersTable(orders){
     <td style="font-family:var(--mono);font-size:11px;color:var(--text2)">${o.end}</td>
     <td><span style="font-family:var(--mono);font-weight:600;color:var(--text)">${o.total}</span></td>
     <td>${badge(o.status)}</td>
-    <td><div style="display:flex;gap:4px"><button class="btn btn-g btn-s">Editar</button><button class="btn btn-g btn-s">🧾</button></div></td>
+    <td><div style="display:flex;gap:4px"><button class="btn btn-g btn-s" onclick="openEditOrder('${o.id}')">✏️</button><button class="btn btn-g btn-s">🧾</button></div></td>
   </tr>`).join('')}</tbody></table>`;
 }
 function renderOrders(){
@@ -1109,7 +1558,7 @@ function renderClients(){
     <th>ID</th><th>Nombre</th><th>Tipo</th><th>RTN</th><th>Teléfono</th><th>Ciudad</th><th>Órdenes</th><th>Acumulado</th><th>Estado</th>
   </tr></thead><tbody>${DATA.clients.map(c=>`<tr>
     <td><span class="mono">${c.id}</span></td>
-    <td style="font-weight:600;color:var(--text)">${c.name}</td>
+    <td style="font-weight:600;color:var(--blue);cursor:pointer;text-decoration:underline" onclick="openClientProfile('${c.id}')">${c.name}</td>
     <td><span class="badge bp">${c.type}</span></td>
     <td style="font-family:var(--mono);font-size:11px;color:var(--text2)">${c.rtn}</td>
     <td style="font-size:12px">${c.phone}</td>
