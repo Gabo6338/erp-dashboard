@@ -58,10 +58,14 @@ function setIdType(type){
   }
 }
 function openMapsLink(){
-  const lat=document.getElementById('m-c-lat')?.value;
-  const lng=document.getElementById('m-c-lng')?.value;
-  if(lat&&lng) window.open(`https://www.google.com/maps?q=${lat},${lng}`,'_blank');
-  else alert('Ingresa latitud y longitud primero.');
+  const lat=(document.getElementById('m-c-lat')?.value||'').trim();
+  const lng=(document.getElementById('m-c-lng')?.value||'').trim();
+  if(lat&&lng){
+    const url='https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(lat+','+lng);
+    window.open(url,'_blank','noopener,noreferrer');
+  } else {
+    alert('Ingresa latitud y longitud primero.');
+  }
 }
 
 // ── REPORTS: period + chart type ──────────────────────────
@@ -407,6 +411,152 @@ const _origLogin = doLogin;
 function doLogin(){
   _origLogin();
   currentUserName = document.getElementById('l-name').value.trim() || 'Gabu';
+}
+
+
+// ── REBUILD PERIOD + CHART TYPE TABS ─────────────────────
+function buildReportTabs(){
+  const periods = [
+    ['hoy','Hoy'],['semana','Semana'],['quincena','Quincena'],['mes','Mes'],
+    ['q1','Q1'],['q2','Q2'],['q3','Q3'],['q4','Q4'],
+    ['semestre','Semestre'],['año','Año'],['todo','Todo']
+  ];
+  const ptEl = document.getElementById('period-tabs');
+  if(ptEl){
+    ptEl.innerHTML = periods.map(([id,lbl])=>
+      `<button class="tab${reportPeriod===id?' active':''}" onclick="setReportPeriod('${id}',this)">${lbl}</button>`
+    ).join('');
+  }
+  const chartTypes = [['bar','📊 Barras'],['line','📈 Línea'],['area','🏔 Área'],['radar','🕸 Radar']];
+  const ctEl = document.getElementById('chart-type-tabs');
+  if(ctEl){
+    ctEl.innerHTML = chartTypes.map(([id,lbl])=>
+      `<button class="tab${reportChartType===id?' active':''}" onclick="setChartType('${id}',this)">${lbl}</button>`
+    ).join('');
+  }
+}
+
+// Override setReportPeriod and setChartType to rebuild tabs correctly
+function setReportPeriod(p, btn){
+  reportPeriod = p;
+  buildReportTabs();
+  renderReports();
+}
+function setChartType(t, btn){
+  reportChartType = t;
+  buildReportTabs();
+  renderReports();
+}
+
+// Override renderReports to call buildReportTabs first
+const _baseRenderReports = renderReports;
+function renderReports(){
+  buildReportTabs();
+  const kpi = PERIOD_KPIS[reportPeriod] || PERIOD_KPIS.mes;
+  const rpKpis = document.getElementById('report-kpis');
+  if(rpKpis) rpKpis.innerHTML=[
+    {label:'Ingresos totales',val:kpi.ing,icon:'💰',color:'#10B981'},
+    {label:'Costo operativo',val:kpi.cost,icon:'⚙️',color:'#F59E0B'},
+    {label:'Utilidad neta',val:kpi.util,icon:'📈',color:'#3B82F6'},
+    {label:'Margen neto',val:kpi.mg,icon:'🎯',color:'#8B5CF6'},
+  ].map(s=>`<div class="card" style="border-color:${s.color}33">
+    <div class="c-head"><span class="c-title">${s.label}</span><span>${s.icon}</span></div>
+    <div class="stat-val" style="color:${s.color};font-size:20px">${s.val}</div>
+  </div>`).join('');
+
+  setTimeout(()=>{
+    const ctx = document.getElementById('chartBar');
+    if(!ctx) return;
+    if(chartBar) chartBar.destroy();
+    const d = REPORT_DATA[reportPeriod] || REPORT_DATA.semestre;
+    const isRadar = reportChartType==='radar';
+    const isLine  = reportChartType==='line';
+    const isArea  = reportChartType==='area';
+    const chartType = isRadar?'radar':(isLine||isArea?'line':'bar');
+    const labels = isRadar ? (d.labels.length>=3?d.labels.slice(0,6):['L1','L2','L3','L4','L5','L6']) : d.labels;
+    chartBar = new Chart(ctx.getContext('2d'),{
+      type: chartType,
+      data:{
+        labels,
+        datasets:[
+          {label:'Rentas',   data:isRadar?d.rentas.slice(0,labels.length):d.rentas,   backgroundColor:isLine||isArea?'rgba(59,130,246,.15)':'#3B82F6',borderColor:'#3B82F6',fill:isArea,tension:.4,borderRadius:isLine||isArea||isRadar?0:4,borderWidth:2},
+          {label:'Ventas',   data:isRadar?d.ventas.slice(0,labels.length):d.ventas,   backgroundColor:isLine||isArea?'rgba(16,185,129,.15)':'#10B981',borderColor:'#10B981',fill:isArea,tension:.4,borderRadius:isLine||isArea||isRadar?0:4,borderWidth:2},
+          {label:'Servicios',data:isRadar?d.servicios.slice(0,labels.length):d.servicios,backgroundColor:isLine||isArea?'rgba(139,92,246,.15)':'#8B5CF6',borderColor:'#8B5CF6',fill:isArea,tension:.4,borderRadius:isLine||isArea||isRadar?0:4,borderWidth:2},
+        ]
+      },
+      options:{
+        responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:true,position:'bottom',labels:{color:'#94A3B8',font:{size:11},padding:16}},tooltip:{callbacks:{label:v=>`L ${v.raw.toLocaleString()}`}}},
+        scales: isRadar?{r:{grid:{color:'#1E293B'},ticks:{color:'#475569',font:{size:9},callback:v=>`L${(v/1000).toFixed(0)}k`},pointLabels:{color:'#94A3B8',font:{size:11}}}}
+          :{x:{grid:{color:'#1E293B'},ticks:{color:'#475569',font:{size:11}}},y:{grid:{color:'#1E293B'},ticks:{color:'#475569',font:{size:10},callback:v=>`L${(v/1000).toFixed(0)}k`}}}
+      }
+    });
+  },80);
+}
+
+// ── FIX SETIDTYPE — more robust version ───────────────────
+function setIdType(type){
+  currentIdType = type;
+  ['RTN','DNI','N/A'].forEach(t=>{
+    const idMap = {'RTN':'btn-rtn','DNI':'btn-dni','N/A':'btn-nid'};
+    const el = document.getElementById(idMap[t]);
+    if(el){
+      if(t===type){ el.className='btn btn-p btn-s'; el.style.borderRadius='6px'; }
+      else { el.className='btn btn-g btn-s'; el.style.borderRadius='6px'; }
+    }
+  });
+  const lbl = document.getElementById('id-field-lbl');
+  const inp = document.getElementById('m-c-rtn');
+  if(!lbl||!inp) return;
+  if(type==='N/A'){
+    lbl.textContent='Identificación';
+    inp.value='N/A'; inp.disabled=true; inp.style.opacity='.5';
+  } else {
+    lbl.textContent='Número de '+type;
+    if(inp.value==='N/A') inp.value='';
+    inp.disabled=false; inp.style.opacity='1';
+    inp.placeholder=type==='RTN'?'00000000000000':'0801-2000-00000';
+  }
+}
+
+// ── FIX SAVEBILLING — use editable fac number ─────────────
+function saveBilling(){
+  const facnum = (document.getElementById('m-b-facnum')?.value||'').trim();
+  const client = document.getElementById('m-b-client').value;
+  const amount = document.getElementById('m-b-amount').value;
+  const concept= document.getElementById('m-b-concept').value.trim();
+  const date   = document.getElementById('m-b-date').value;
+  const pay    = document.getElementById('m-b-pay').value;
+  if(!amount||!concept){alert('Completa monto y concepto.');return;}
+  const autoFac = 'FAC-'+(2210+DATA.billing.length);
+  const finalFac = facnum || autoFac;
+  // check duplicate
+  if(DATA.billing.find(b=>b.fac===finalFac)){
+    alert(`El número de factura "${finalFac}" ya existe. Usa uno diferente.`);return;
+  }
+  DATA.billing.unshift({fac:finalFac,client,items:concept,start:date,end:'—',total:`L ${parseFloat(amount).toLocaleString()}`,status:'activo',pay,type:'Factura'});
+  addHistoryEntry('sale','🧾',`Factura emitida: ${finalFac}`,`${client} · L ${parseFloat(amount).toLocaleString()}`);
+  document.getElementById('suc-billing').style.display='block';
+  setTimeout(()=>{closeModal('modal-billing');renderBilling();},1200);
+}
+
+// ── FIX openModal for billing — pre-fill fac number ───────
+const _origOpenModal = openModal;
+function openModal(id){
+  _origOpenModal(id);
+  if(id==='modal-billing'){
+    const nextFac = 'FAC-'+(2210+DATA.billing.length);
+    const fnEl = document.getElementById('m-b-facnum');
+    if(fnEl) fnEl.value = nextFac;
+    // reset ISV state
+    isvActive=true;
+    const tgl=document.getElementById('isv-toggle');
+    if(tgl) tgl.classList.add('on');
+    const lbl=document.getElementById('isv-status-lbl');
+    if(lbl) lbl.textContent='Activado';
+    const fields=document.getElementById('isv-fields');
+    if(fields) fields.style.display='flex';
+  }
 }
 
 </script>
@@ -840,25 +990,8 @@ tbody td:first-child{color:var(--text);font-weight:500;}
         </div>
         <!-- REPORT CONTROLS -->
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;">
-          <div style="display:flex;gap:2px;background:var(--surface2);border-radius:10px;padding:3px;flex-wrap:wrap;">
-            <button class="tab active" id="rp-hoy" onclick="setReportPeriod('hoy',this)">Hoy</button>
-            <button class="tab" id="rp-semana" onclick="setReportPeriod('semana',this)">Semana</button>
-            <button class="tab" id="rp-quincena" onclick="setReportPeriod('quincena',this)">Quincena</button>
-            <button class="tab" id="rp-mes" onclick="setReportPeriod('mes',this)">Mes</button>
-            <button class="tab" id="rp-q1" onclick="setReportPeriod('q1',this)">Q1</button>
-            <button class="tab" id="rp-q2" onclick="setReportPeriod('q2',this)">Q2</button>
-            <button class="tab" id="rp-q3" onclick="setReportPeriod('q3',this)">Q3</button>
-            <button class="tab" id="rp-q4" onclick="setReportPeriod('q4',this)">Q4</button>
-            <button class="tab" id="rp-semestre" onclick="setReportPeriod('semestre',this)">Semestre</button>
-            <button class="tab" id="rp-año" onclick="setReportPeriod('año',this)">Año</button>
-            <button class="tab" id="rp-todo" onclick="setReportPeriod('todo',this)">Todo</button>
-          </div>
-          <div style="display:flex;gap:2px;background:var(--surface2);border-radius:10px;padding:3px;">
-            <button class="tab active" id="ct-bar" onclick="setChartType('bar',this)">📊 Barras</button>
-            <button class="tab" id="ct-line" onclick="setChartType('line',this)">📈 Línea</button>
-            <button class="tab" id="ct-area" onclick="setChartType('area',this)">🏔 Área</button>
-            <button class="tab" id="ct-radar" onclick="setChartType('radar',this)">🕸 Radar</button>
-          </div>
+          <div id="period-tabs" style="display:flex;gap:2px;background:var(--surface2);border-radius:10px;padding:3px;flex-wrap:wrap;"></div>
+          <div id="chart-type-tabs" style="display:flex;gap:2px;background:var(--surface2);border-radius:10px;padding:3px;"></div>
         </div>
         <div class="g4" id="report-kpis"></div>
         <div class="card">
@@ -1085,13 +1218,10 @@ tbody td:first-child{color:var(--text);font-weight:500;}
         <select class="f-sel" id="m-c-type"><option>Empresa</option><option>Individual</option><option>Gobierno</option><option>Institución</option></select></div>
     </div>
     <div class="f-row">
-      <div class="f-grp"><label class="f-lbl">RTN</label><input class="f-in" id="m-c-rtn" placeholder="00000000000000"/></div>
-      <div class="f-grp"><label class="f-lbl">Teléfono</label><input class="f-in" id="m-c-phone" placeholder="+504 0000-0000"/></div>
-    </div>
-    <div class="f-row">
+      <div class="f-grp"><label class="f-lbl">Teléfono principal</label><input class="f-in" id="m-c-phone" placeholder="+504 0000-0000"/></div>
       <div class="f-grp"><label class="f-lbl">Correo electrónico</label><input class="f-in" id="m-c-email" type="email" placeholder="correo@empresa.com"/></div>
-      <div class="f-grp"><label class="f-lbl">Teléfono secundario</label><input class="f-in" id="m-c-phone2" placeholder="+504 0000-0000"/></div>
     </div>
+
     <div class="f-row1 f-grp"><label class="f-lbl">Dirección</label><textarea class="f-ta" id="m-c-addr" placeholder="Dirección completa..." style="min-height:55px"></textarea></div>
     <div class="f-row">
       <div class="f-grp"><label class="f-lbl">Departamento</label>
@@ -1148,8 +1278,12 @@ tbody td:first-child{color:var(--text);font-weight:500;}
     <div class="m-head"><span class="m-title">+ Nueva Factura</span><button class="m-close" onclick="closeModal('modal-billing')">✕</button></div>
     <div class="success-msg" id="suc-billing">✓ Factura creada exitosamente.</div>
     <div class="f-row">
-      <div class="f-grp"><label class="f-lbl">Cliente</label><select class="f-sel" id="m-b-client"></select></div>
+      <div class="f-grp"><label class="f-lbl">Número de factura <span style="color:var(--text3);font-weight:400">(editable)</span></label><input class="f-in" id="m-b-facnum" placeholder="FAC-2210" style="font-family:var(--mono)"/></div>
       <div class="f-grp"><label class="f-lbl">Orden relacionada</label><select class="f-sel" id="m-b-order"></select></div>
+    </div>
+    <div class="f-row">
+      <div class="f-grp"><label class="f-lbl">Cliente</label><select class="f-sel" id="m-b-client"></select></div>
+      <div class="f-grp"><label class="f-lbl">Serie / Correlativo CAI</label><input class="f-in" id="m-b-cai" placeholder="Ej. 000-001-01-00000001"/></div>
     </div>
     <div class="f-row">
       <div class="f-grp"><label class="f-lbl">Fecha de emisión</label><input type="date" class="f-in" id="m-b-date"/></div>
@@ -1558,7 +1692,7 @@ function renderClients(){
     <th>ID</th><th>Nombre</th><th>Tipo</th><th>RTN</th><th>Teléfono</th><th>Ciudad</th><th>Órdenes</th><th>Acumulado</th><th>Estado</th>
   </tr></thead><tbody>${DATA.clients.map(c=>`<tr>
     <td><span class="mono">${c.id}</span></td>
-    <td style="font-weight:600;color:var(--blue);cursor:pointer;text-decoration:underline" onclick="openClientProfile('${c.id}')">${c.name}</td>
+    <td style="font-weight:600;color:var(--blue);cursor:pointer;text-decoration:underline" onclick="openClientProfile(this.getAttribute('data-id'))" data-id="${c.id}">${c.name}</td>
     <td><span class="badge bp">${c.type}</span></td>
     <td style="font-family:var(--mono);font-size:11px;color:var(--text2)">${c.rtn}</td>
     <td style="font-size:12px">${c.phone}</td>
